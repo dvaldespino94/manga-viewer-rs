@@ -1,8 +1,9 @@
+use raylib::prelude::*;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use crate::{Archive, Chunk, IChunkProvider};
 use crate::archive::ArEntryInfo;
-use crate::structs::Message;
+use crate::structs::{Message, ViewerCommand};
+use crate::{Archive, Chunk, IChunkProvider};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -18,17 +19,36 @@ impl<'a> ChunkProvider<'a> {
     pub fn new(path: String) -> Self {
         let archive = Archive::new(&path);
 
-        let (mst, msr) = channel();
-        let (_smt, _smr): (Sender<Message<'a>>, Receiver<Message<'a>>) = channel();
+        let (mtx, mrx): (Sender<Message<'a>>, Receiver<Message<'a>>) = channel();
+        let (_stx, srx): (Sender<Message<'a>>, Receiver<Message<'a>>) = channel();
 
-        std::thread::spawn(move || {});
+        std::thread::spawn(move || {
+            let (_rl, _context) = init().build();
+            loop {
+                let mut chunk_query_count = 0;
+
+                match srx.recv() {
+                    Ok(msg) => match msg {
+                        Message::Command(cmd) => match cmd {
+                            ViewerCommand::MoreChunks { how_many } => chunk_query_count = how_many,
+                        },
+                        Message::ChunkData(_) => {}
+                    },
+                    Err(_) => {
+                        return;
+                    }
+                }
+
+                while chunk_query_count > 0 {}
+            }
+        });
 
         return ChunkProvider {
             archive,
             entries: archive.collect(),
             chunks: Vec::new(),
-            tx: mst,
-            rx: msr,
+            tx: mtx,
+            rx: mrx,
         };
     }
 }
