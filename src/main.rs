@@ -1,12 +1,12 @@
+use crate::chunkprovider::DummyChunkProvider;
+use crate::structs::Chunk;
+use crate::traits::IChunkProvider;
 use raylib::prelude::*;
-use crate::structs::{Chunk};
-use crate::chunkprovider::{ChunkProvider};
-use crate::traits::{IChunkProvider};
 
-pub mod traits;
-pub mod structs;
-pub mod chunkprovider;
 pub mod archive;
+pub mod chunkprovider;
+pub mod structs;
+pub mod traits;
 pub mod unarr;
 
 const APP_TITLE: &str = "Manga Viewer";
@@ -23,12 +23,21 @@ impl<T: IChunkProvider> Application<T> {
         Self {
             current_page: 0,
             current_chunk: 0,
-provider:            None,
+            provider: None,
         }
     }
- 
+
     pub(crate) fn draw(&self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
         context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
+
+        context.gui_progress_bar(
+            Rectangle::new(screen_rect.x+5.0, screen_rect.y + 2.0, screen_rect.width-10.0, 10.0),
+            None,
+            None,
+            12.0,
+            0.0,
+            100.0,
+        );
     }
 }
 
@@ -48,7 +57,7 @@ fn main() {
         APP_VERSION.0, APP_VERSION.1, APP_VERSION.2
     );
 
-    let mut app:Application<ChunkProvider> = Application::new();
+    let mut app: Application<DummyChunkProvider> = Application::new();
 
     const PADDING: f32 = 10.0;
     while !rl.window_should_close() {

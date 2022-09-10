@@ -1,5 +1,7 @@
 use std::sync::mpsc::{Receiver, Sender};
 
+use raylib::prelude::*;
+
 use crate::structs::Message;
 use crate::archive::{Archive, ArEntryInfo};
 use crate::structs::{Chunk};
@@ -57,11 +59,15 @@ impl<'a> ChunkProvider<'a> {
 
 impl IChunkProvider for ChunkProvider<'_> {
     fn get_chunk(&self, _: usize) -> Option<Chunk> {
-        return None;
+        None
     }
 
     fn chunk_count(&self) -> usize {
         return self.chunks.len();
+    }
+
+    fn done_processing(&self) -> bool {
+        todo!()
     }
 
     fn destroy(&self) {
@@ -72,7 +78,37 @@ impl IChunkProvider for ChunkProvider<'_> {
         todo!()
     }
 
-    fn done_processing() -> bool {
-        todo!()
+    fn get_texture(&self, index: usize) -> Option<Texture2D>{
+        None
+    }
+}
+
+
+pub struct DummyChunkProvider{
+    _chunk_count: usize,
+    _done: bool,
+}
+
+impl IChunkProvider for DummyChunkProvider {
+    fn get_chunk(&self, index: usize) -> Option<Chunk> {
+        None
+    }
+
+    fn chunk_count(&self) -> usize {
+        self._chunk_count
+    }
+
+    fn done_processing(&self) -> bool {
+        return self._done;
+    }
+
+    fn destroy(&self) {}
+
+    fn open(path: &str) -> Self {
+        return Self { _chunk_count: 0, _done: false }
+    }
+
+    fn get_texture(&self, index: usize) -> Option<Texture2D> {
+        None
     }
 }
