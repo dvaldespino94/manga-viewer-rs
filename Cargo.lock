@@ -113,6 +113,7 @@ dependencies = [
 name = "manga-viewer-rs"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "raylib",
  "rusqlite",
  "toml",

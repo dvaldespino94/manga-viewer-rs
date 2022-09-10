@@ -1,4 +1,3 @@
-use std::ffi::CStr;
 use std::ffi::CString;
 
 use crate::unarr::*;
@@ -10,30 +9,6 @@ pub struct ArEntryInfo<'a> {
     pub offset: i64,
     pub size: usize,
     pub filetime: i64,
-}
-
-impl ArEntryInfo<'_> {
-    pub fn read(&self, handle: *mut ArArchive) -> Result<Vec<u8>, String> {
-        if unsafe { ar_parse_entry_at(handle, self.offset) } {
-            let mut buffer = Vec::<u8>::with_capacity(self.size);
-            let buffer_ptr = buffer.as_mut_ptr();
-
-            if unsafe {
-                ar_entry_uncompress(
-                    handle,
-                    buffer_ptr as *mut std::ffi::c_void,
-                    self.size.try_into().unwrap(),
-                )
-            } {
-                unsafe { buffer.set_len(self.size) };
-                return Ok(buffer);
-            } else {
-                return Err("Error uncompresing".to_string());
-            }
-        } else {
-            return Err("Error parsing entry".to_string());
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -51,15 +26,35 @@ impl Archive {
         //TODO: Handle different compression formats
         let handle = unsafe { ar_open_rar_archive(stream) };
 
-        return Archive {
-            handle: handle,
-            stream: stream,
-        };
+        return Archive { handle, stream };
     }
 
     pub fn close(&self) {
         unsafe { ar_close_archive(self.handle) };
         unsafe { ar_close(self.stream) };
+    }
+
+    pub fn read(&self, offset: i64, size: usize) -> Result<Vec<u8>, String> {
+        if unsafe { ar_parse_entry_at(self.handle, offset) } {
+            let mut buffer = Vec::<u8>::with_capacity(size);
+            let buffer_ptr = buffer.as_mut_ptr();
+
+            if unsafe {
+                ar_entry_uncompress(
+                    self.handle,
+                    buffer_ptr as *mut std::ffi::c_void,
+                    size.try_into().unwrap(),
+                )
+            } {
+                unsafe { buffer.set_len(size) };
+
+                return Ok(buffer);
+            } else {
+                return Err("Error uncompresing".to_string());
+            }
+        } else {
+            return Err("Error parsing entry".to_string());
+        }
     }
 }
 
@@ -67,14 +62,25 @@ impl Iterator for Archive {
     type Item = ArEntryInfo<'static>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        println!("Parsing entry");
         if unsafe { ar_parse_entry(self.handle) } {
-            let name = unsafe { ar_entry_get_name(self.handle) };
+            let name_source = unsafe { ar_entry_get_name(self.handle) };
+            let name_len = unsafe { libc::strlen(name_source) };
             let filetime = unsafe { ar_entry_get_filetime(self.handle) };
+            let name = unsafe { libc::malloc(name_len + 1) as *mut i8 };
+
+            unsafe {
+                libc::strcpy(name, name_source);
+            }
+
+            println!(
+                "{:?} {:?}",
+                std::ptr::addr_of!(name_source),
+                std::ptr::addr_of!(name)
+            );
 
             return Some(ArEntryInfo {
-                name: unsafe { CStr::from_ptr(name).to_str().unwrap() },
-                filetime: filetime,
+                name: unsafe { std::ffi::CStr::from_ptr(name) }.to_str().unwrap(),
+                filetime,
                 offset: unsafe { ar_entry_get_offset(self.handle) },
                 size: unsafe { ar_entry_get_size(self.handle).try_into().unwrap() },
             });

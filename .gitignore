@@ -2,3 +2,4 @@
 manga-viewer-rs*
 .idea
 .DS_Store
+/out
