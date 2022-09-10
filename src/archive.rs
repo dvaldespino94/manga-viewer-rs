@@ -72,12 +72,6 @@ impl Iterator for Archive {
                 libc::strcpy(name, name_source);
             }
 
-            println!(
-                "{:?} {:?}",
-                std::ptr::addr_of!(name_source),
-                std::ptr::addr_of!(name)
-            );
-
             return Some(ArEntryInfo {
                 name: unsafe { std::ffi::CStr::from_ptr(name) }.to_str().unwrap(),
                 filetime,

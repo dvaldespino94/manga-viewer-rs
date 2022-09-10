@@ -1,4 +1,5 @@
 use raylib::prelude::*;
+use rusqlite::Connection;
 
 use crate::archive::Archive;
 use crate::archive::ArEntryInfo;
@@ -55,6 +56,9 @@ fn draw_current_chunk(context: &mut RaylibDrawHandle<'_>, screen_rect: &Rectangl
 fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
     //How many white strips counts as a chunk separator
     const WHITE_STRIP_THRESHOLD: usize = 5;
+
+    //Minimal height a chunk must have to be recognized as such
+    const MIN_CHUNK_HEIGHT: usize = WHITE_STRIP_THRESHOLD + 1;
 
     //Set image format to 8bit grayscale, to decrease processing costs
     image.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAYSCALE);
@@ -136,26 +140,7 @@ fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
         })
     }
 
-    // for y in 0..white_strip_map.len() {
-    //     let last_line_was_blank = last_change.0;
-    //     let its_the_first_line = y == 0;
-
-    //     if white_strip_map[y] != last_change.0 && (y - last_change.1 > WHITE_STRIP_THRESHOLD) {
-    //         last_change = (white_strip_map[y], y);
-    //         chunk_meta.push(last_change.clone());
-
-    //         if white_strip_map[y] && (last_line_was_blank || its_the_first_line) {
-    //             let height = y - last_change.1;
-    //             chunks.push(Chunk {
-    //                 status: ChunkStatus::Idle,
-    //                 rect: Rectangle::new(0.0, y as f32, image.width as f32, height as f32),
-    //             });
-    //         }
-    //     }
-    // }
-
-    const MIN_CHUNK_HEIGHT: f32 =20.0;
-    return chunks.into_iter().filter(|x| x.rect.height>MIN_CHUNK_HEIGHT).collect();
+    return chunks.into_iter().filter(|x| x.rect.height > (MIN_CHUNK_HEIGHT as f32)).collect();
 }
 
 fn process_page<'a>(
@@ -208,7 +193,19 @@ fn main() {
     let mut last_image: Option<Image> = None;
     let mut last_image_size: Vector2 = Vector2::new(0.0, 0.0);
 
+    let mut page_index=0;
     let mut chunk_index = 0;
+
+    let mut db=Connection::open("data.sqlite").expect("Error opening connection with database");
+    db.execute("CREATE TABLE IF NOT EXISTS Chunks(\
+        id INTEGER PRIMARY KEY,\
+        page INTEGER,\
+        x INTEGER,\
+        y INTEGER,\
+        w INTEGER,\
+        h INTEGER\
+    )", []).expect("Error creating table");
+
     while !rl.window_should_close() {
         if last_image.is_some() {
             last_image_size = Vector2::new(
@@ -252,30 +249,31 @@ fn main() {
 
                 context.draw_rectangle_lines(x as i32, y as i32, w as i32, h as i32, Color::GRAY);
             }
-            // std::thread::sleep(std::time::Duration::from_secs(1));
         }
 
         match archive.next() {
             Some(page) => {
                 (last_image, last_chunks) = process_page(&mut context, archive, &page);
 
-                let mut img = last_image.clone().unwrap();
-                img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+                // let mut img = last_image.clone().unwrap();
+                // img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8);
 
                 for chunk in last_chunks.iter() {
-                    // let mut rect=chunk.rect;
-                    // rect.x+=10.0;
-                    // rect.width-=20.0;
+                    // let new_image: Image = last_image.as_ref().unwrap().from_image(chunk.rect);
+                    // new_image.export_image(format!("./out/chunk_{chunk_index:02}.jpg").as_str());
 
-                    // img.draw_rectangle_lines(rect, 2, Color::RED);
-                    let new_image: Image = last_image.as_ref().unwrap().from_image(chunk.rect);
-                    new_image.export_image(format!("./out/chunk_{chunk_index:02}.jpg").as_str());
+                    let tx=db.transaction().expect("Error starting transaction!");
+
+                    tx.execute("INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);",[
+                        chunk_index, page_index,chunk.rect.x as i32,chunk.rect.y as i32,chunk.rect.width as i32,chunk.rect.height as i32
+                    ]).expect("Error inserting Chunk into DB");
+
+                    tx.commit().expect("Error commiting transaction");
+
                     chunk_index += 1;
                 }
-                // img.export_image(format!("chunk_{chunk_index:02}.jpg").as_str());
 
-                println!("Got {:?} chunks", last_chunks.len());
-                println!("Page: {:?}", page);
+                page_index+=1;
             }
             None => return,
         };
