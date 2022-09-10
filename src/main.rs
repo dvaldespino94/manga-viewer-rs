@@ -1,177 +1,39 @@
 use raylib::prelude::*;
-use rusqlite::Connection;
+use crate::structs::{Chunk};
+use crate::chunkprovider::{ChunkProvider};
+use crate::traits::{IChunkProvider};
 
-use crate::archive::Archive;
-use crate::archive::ArEntryInfo;
-use crate::structs::{Chunk, ChunkStatus};
-use crate::traits::IChunkProvider;
-
-mod archive;
-mod chunkprovider;
-mod structs;
-mod traits;
-mod unarr;
+pub mod traits;
+pub mod structs;
+pub mod chunkprovider;
+pub mod archive;
+pub mod unarr;
 
 const APP_TITLE: &str = "Manga Viewer";
 const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
-#[allow(unused)]
-fn draw_loading_message(context: &mut RaylibDrawHandle<'_>, screen_rect: &Rectangle) {
-    const MESSAGE_WIDTH: i32 = 126;
-    const FONT_SIZE: i32 = 25;
-    context.draw_text(
-        "LOADING",
-        (screen_rect.x as i32) + ((screen_rect.width as i32) - MESSAGE_WIDTH) / 2,
-        (screen_rect.y as i32) + (screen_rect.height as i32 - FONT_SIZE) / 2,
-        FONT_SIZE,
-        Color::BLACK,
-    );
+struct Application<T: IChunkProvider> {
+    current_page: usize,
+    current_chunk: usize,
+    provider: Option<T>,
 }
 
-#[allow(unused)]
-fn draw_no_chunk_message(context: &mut RaylibDrawHandle<'_>, screen_rect: &Rectangle) {
-    const MESSAGE_WIDTH: i32 = 126;
-    const FONT_SIZE: i32 = 25;
-    context.draw_text(
-        "NO CHUNK",
-        (screen_rect.x as i32) + ((screen_rect.width as i32) - MESSAGE_WIDTH) / 2,
-        (screen_rect.y as i32) + (screen_rect.height as i32 - FONT_SIZE) / 2,
-        FONT_SIZE,
-        Color::RED,
-    );
-}
-
-#[allow(unused)]
-fn draw_current_chunk(context: &mut RaylibDrawHandle<'_>, screen_rect: &Rectangle) {
-    context.draw_rectangle(
-        screen_rect.x as i32,
-        screen_rect.y as i32,
-        screen_rect.width as i32,
-        screen_rect.height as i32,
-        Color::WHITE,
-    );
-}
-
-//Get chunk metadata from image
-fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
-    //How many white strips counts as a chunk separator
-    const WHITE_STRIP_THRESHOLD: usize = 5;
-
-    //Minimal height a chunk must have to be recognized as such
-    const MIN_CHUNK_HEIGHT: usize = WHITE_STRIP_THRESHOLD + 1;
-
-    //Set image format to 8bit grayscale, to decrease processing costs
-    image.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_GRAYSCALE);
-
-    //Get image's color data (w*h*depth bytes)
-    let colors = image.get_image_data();
-
-    //Bitmap of horizontal white strips
-    let mut white_strip_map = Vec::<bool>::new();
-
-    //Iterate vertically over the whole image
-    for y in 0..image.height {
-        //The strips are marked as white by default
-        let mut white = true;
-
-        //Iterate over the whole strip until non-white pixels are found
-        for x in 0..image.width {
-            //Transform x,y coordinates to linear pixel offset
-            let offset: usize = (x + y * image.width).try_into().unwrap();
-
-            //Compare the color and a white threshold
-            if colors[offset].r < 250 {
-                white = false;
-                break;
-            }
+impl<T: IChunkProvider> Application<T> {
+    pub fn new() -> Self {
+        Self {
+            current_page: 0,
+            current_chunk: 0,
+provider:            None,
         }
-
-        //Push the not-white status of the line
-        white_strip_map.push(white);
     }
-
-    //Push an extra white line, so the last chunk is always added to resulting Vec
-    white_strip_map.push(true);
-
-    //Chunk vector
-    let mut chunks = Vec::<Chunk>::new();
-
-    //Initialize state-machine
-    let mut last = white_strip_map[0];
-    let mut last_chunk_start = 0;
-
-    //Starts in 1 cause first item was taken as initial status anyways
-    let mut y = 1;
-
-    while y < white_strip_map.len() {
-        //Act only at borders
-        if last != white_strip_map[y] {
-            //If a chunk end was found
-            if white_strip_map[y] {
-                //The chunk's height is calculated
-                let height = y - last_chunk_start;
-                chunks.push(Chunk {
-                    status: ChunkStatus::Idle,
-                    rect: Rectangle::new(0.0, last_chunk_start as f32, image.width as f32, height as f32),
-                });
-                last_chunk_start = y+1;
-            } else {
-                //Register that a chunk started here
-                last_chunk_start = y;
-            }
-        }
-
-        //Update state-machine
-        last = white_strip_map[y];
-
-        //Increment y
-        y += 1;
+ 
+    pub(crate) fn draw(&self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
     }
-    //If last strip was true then add the last part as a chunk
-    if *white_strip_map.last().unwrap() {
-        chunks.push(Chunk {
-            status: ChunkStatus::Idle,
-            rect: Rectangle::new(
-                0.0,
-                last_chunk_start as f32,
-                image.width as f32,
-                (image.height - last_chunk_start as i32) as f32,
-            ),
-        })
-    }
-
-    return chunks.into_iter().filter(|x| x.rect.height > (MIN_CHUNK_HEIGHT as f32)).collect();
-}
-
-fn process_page<'a>(
-    _context: &mut RaylibDrawHandle<'_>,
-    archive: Archive,
-    entry: &ArEntryInfo,
-) -> (Option<Image>, Vec<Chunk>) {
-    let data = archive
-        .read(entry.offset, entry.size)
-        .expect("Error getting image data");
-
-    //TODO: Get extension from file name
-    match Image::load_image_from_mem(".jpg", &data, data.len().try_into().unwrap()) {
-        Ok(mut image) => {
-            let chunks = get_chunks_from_image(&mut image);
-            return (Some(image), chunks);
-        }
-        Err(_) => {
-            println!("Error loading image from {}", entry.name);
-        }
-    };
-
-    (None, Vec::new())
 }
 
 fn main() {
-    let mut archive: Archive = Archive::new(
-        &"/Users/david.valdespino/Downloads/Spy x Family/Spy x Family - Tomo 02 (#006-011).cbr"
-            .to_string(),
-    );
-
+    //Initialze RayGUI
     let (mut rl, thread) = init()
         //Set Window Size
         .size(400, 200)
@@ -181,46 +43,22 @@ fn main() {
         //Finally call build to get the context initialized
         .build();
 
-    let _current_chunk: Option<Chunk> = None;
-    let _current_chunk_index = 0;
-
     let app_version_string = format!(
         "{:}.{:02}.{:02}",
         APP_VERSION.0, APP_VERSION.1, APP_VERSION.2
     );
 
-    let mut last_chunks: Vec<Chunk> = Vec::new();
-    let mut last_image: Option<Image> = None;
-    let mut last_image_size: Vector2 = Vector2::new(0.0, 0.0);
+    let mut app:Application<ChunkProvider> = Application::new();
 
-    let mut page_index=0;
-    let mut chunk_index = 0;
-
-    let mut db=Connection::open("data.sqlite").expect("Error opening connection with database");
-    db.execute("CREATE TABLE IF NOT EXISTS Chunks(\
-        id INTEGER PRIMARY KEY,\
-        page INTEGER,\
-        x INTEGER,\
-        y INTEGER,\
-        w INTEGER,\
-        h INTEGER\
-    )", []).expect("Error creating table");
-
+    const PADDING: f32 = 10.0;
     while !rl.window_should_close() {
-        if last_image.is_some() {
-            last_image_size = Vector2::new(
-                last_image.as_ref().unwrap().width as f32,
-                last_image.as_ref().unwrap().height as f32,
-            );
-        }
-
         let mut context = rl.begin_drawing(&thread);
 
         let screen_rect = Rectangle::new(
-            0.0,
-            0.0,
-            context.get_screen_width() as f32,
-            context.get_screen_height() as f32,
+            PADDING,
+            PADDING + 30f32,
+            context.get_screen_width() as f32 - 2f32 * PADDING,
+            context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
         );
 
         context.clear_background(Color::LIGHTGRAY);
@@ -228,54 +66,7 @@ fn main() {
         //Draw the header and version
         context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
         context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
-        {
-            let scale_coeff: f32 = last_image_size.y / (screen_rect.height as f32);
-            let x_offset = (screen_rect.width - (last_image_size.x / scale_coeff)) / 2.0;
-            let y_offset = (screen_rect.height - (last_image_size.y / scale_coeff)) / 2.0;
 
-            context.draw_rectangle(
-                ((screen_rect.width - (last_image_size.x / scale_coeff)) / 2.0) as i32,
-                ((screen_rect.height - (last_image_size.y / scale_coeff)) / 2.0) as i32,
-                (last_image_size.x / scale_coeff) as i32,
-                (last_image_size.y / scale_coeff) as i32,
-                Color::BLACK,
-            );
-
-            for chunk in last_chunks {
-                let x = x_offset + (chunk.rect.x) / scale_coeff;
-                let y = y_offset + (chunk.rect.y) / scale_coeff;
-                let w = (chunk.rect.width) / scale_coeff;
-                let h = (chunk.rect.height) / scale_coeff;
-
-                context.draw_rectangle_lines(x as i32, y as i32, w as i32, h as i32, Color::GRAY);
-            }
-        }
-
-        match archive.next() {
-            Some(page) => {
-                (last_image, last_chunks) = process_page(&mut context, archive, &page);
-
-                // let mut img = last_image.clone().unwrap();
-                // img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8);
-
-                for chunk in last_chunks.iter() {
-                    // let new_image: Image = last_image.as_ref().unwrap().from_image(chunk.rect);
-                    // new_image.export_image(format!("./out/chunk_{chunk_index:02}.jpg").as_str());
-
-                    let tx=db.transaction().expect("Error starting transaction!");
-
-                    tx.execute("INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);",[
-                        chunk_index, page_index,chunk.rect.x as i32,chunk.rect.y as i32,chunk.rect.width as i32,chunk.rect.height as i32
-                    ]).expect("Error inserting Chunk into DB");
-
-                    tx.commit().expect("Error commiting transaction");
-
-                    chunk_index += 1;
-                }
-
-                page_index+=1;
-            }
-            None => return,
-        };
+        app.draw(screen_rect, &mut context);
     }
 }

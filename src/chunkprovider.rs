@@ -1,8 +1,9 @@
 use std::sync::mpsc::{Receiver, Sender};
 
-use crate::archive::ArEntryInfo;
 use crate::structs::Message;
-use crate::{Archive, Chunk, IChunkProvider};
+use crate::archive::{Archive, ArEntryInfo};
+use crate::structs::{Chunk};
+use crate::traits::{IChunkProvider};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -68,6 +69,10 @@ impl IChunkProvider for ChunkProvider<'_> {
     }
 
     fn open(_path: &str) -> Self {
+        todo!()
+    }
+
+    fn done_processing() -> bool {
         todo!()
     }
 }

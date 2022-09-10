@@ -17,6 +17,7 @@ pub struct Archive {
     pub stream: *mut ArStream,
 }
 
+#[allow(unused)]
 impl Archive {
     pub fn new(_path: &str) -> Self {
         let path = CString::new(_path).unwrap();
