@@ -10,19 +10,29 @@ pub mod structs;
 pub mod traits;
 pub mod unarr;
 
+//Constants and info for the whole application
 const APP_TITLE: &str = "Manga Viewer";
 const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
+//Main Application class, holds viewer state and provider
 struct Application<T: IChunkProvider> {
+    //Current chunk index
     current_chunk: usize,
+    //Chunk/Texture provider
     provider: Option<T>,
+    //Images to be converted into textures
     image_queries: Vec<usize>,
+    //Hash keeping the textures
     textures: HashMap<usize, Option<Texture2D>>,
 }
 
+//TODO: Keep textures hash as light as possible, freeing non used textures
 impl<'a, T: IChunkProvider> Application<T> {
+    /// Creates a new [`Application<T>`].
     pub fn new() -> Self {
+        //Instantiate the provider
         let provider: Option<T> = Some(T::new());
+        //Return a new application
         Self {
             current_chunk: 0,
             provider,
@@ -32,26 +42,39 @@ impl<'a, T: IChunkProvider> Application<T> {
     }
 
     #[inline]
+    //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        //Handle user input
         self.handle_input(context);
 
+        //Draw borders(this is intended for debugging only)
         context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
+        //Unwrap a reference to the provider
         let provider = self.provider.as_ref().unwrap();
+        //If a chunk can be retrieved from the provider
         if let Some(chunk) = provider.get_chunk(self.current_chunk) {
+            //Check if there is a texture already loaded from the provider
             let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
                 // println!("Getting texture from cache!");
+                //Unwrap the texture from the local hash
                 self.textures.get(&chunk.texture_index).unwrap()
             } else {
                 // println!("Requesting image {}", chunk.texture_index);
+                //Add the texture index to texture-query list
                 self.image_queries.push(chunk.texture_index);
                 &None
             };
 
+            //If the texture exists in cache
             if let Some(t) = texture {
+                //Calculate the target rectangle for the texture
                 let mut target_rect = screen_rect;
+
+                //Width/Height Ratio
                 let coeff = target_rect.width / target_rect.height;
 
+                //Draw the texture
                 context.draw_texture_pro(
                     texture.as_ref().unwrap(),
                     chunk.rect,
@@ -61,6 +84,7 @@ impl<'a, T: IChunkProvider> Application<T> {
                     Color::WHITE,
                 )
             } else {
+                //Draw a label with a "No Texture" message
                 context.draw_text(
                     "No Texture",
                     screen_rect.x as i32 + 10,
@@ -87,9 +111,12 @@ impl<'a, T: IChunkProvider> Application<T> {
         );
     }
 
+    //Handle user input
     fn handle_input(&mut self, context: &mut RaylibDrawHandle) {
+        //Flag to signal that the user pressed next/prev or scrolled the image
         let mut something_changed = false;
 
+        //Check for simple next/prev events
         if context.is_key_pressed(KeyboardKey::KEY_PAGE_DOWN)
             || context.is_key_pressed(KeyboardKey::KEY_RIGHT)
         {
@@ -104,6 +131,7 @@ impl<'a, T: IChunkProvider> Application<T> {
             something_changed = true;
         }
 
+        //Keep current_chunk into bounds
         if something_changed {
             if let Some(provider) = self.provider.as_ref() {
                 if self.current_chunk >= provider.chunk_count() {
@@ -126,28 +154,39 @@ fn main() {
         //Finally call build to get the context initialized
         .build();
 
+    //Format the Version string
     let app_version_string = format!(
         "{:}.{:02}.{:02}",
         APP_VERSION.0, APP_VERSION.1, APP_VERSION.2
     );
 
+    //Instantiate the application
     let mut app: Application<DummyChunkProvider> = Application::new();
 
+    //Padding for the main UI
     const PADDING: f32 = 10.0;
+    //RayLib's mainloop
     while !rl.window_should_close() {
+        //Check for texture queries
         for query in app.image_queries.iter() {
             println!("Loading texture {:?}", query);
 
+            //Try to get the image from the provider
             if let Some(image) = app.provider.as_ref().unwrap().get_image(*query) {
+                //Get the texture from the image
                 let value = Some(rl.load_texture_from_image(&thread, image).unwrap());
+                //Insert the texture into the app's index/texture hash
                 app.textures.insert(*query, value);
             }
         }
 
+        //Clear query vec
         app.image_queries.clear();
 
+        //Get the RL Context
         let mut context = rl.begin_drawing(&thread);
 
+        //Cache screen rectangle, adding offsets and correcting width/height
         let screen_rect = Rectangle::new(
             PADDING,
             PADDING + 30f32,
@@ -155,12 +194,14 @@ fn main() {
             context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
         );
 
+        //Clear the screen's background
         context.clear_background(Color::LIGHTGRAY);
 
         //Draw the header and version
         context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
         context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
 
+        //Actually draw the application
         app.draw(screen_rect, &mut context);
     }
 }
