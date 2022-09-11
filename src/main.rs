@@ -229,11 +229,11 @@ fn main() {
         //Clear the screen's background
         context.clear_background(Color::LIGHTGRAY);
 
+        //Draw the application
+        app.draw(screen_rect, &mut context);
+
         //Draw the header and version
         context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
         context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
-
-        //Actually draw the application
-        app.draw(screen_rect, &mut context);
     }
 }
