@@ -1,7 +1,6 @@
-use raylib::ffi::rand;
 use raylib::prelude::*;
 
-use crate::structs::Chunk;
+use crate::structs::{Chunk, ComicMetadata};
 use crate::traits::IChunkProvider;
 
 // #[derive(Debug)]
@@ -130,21 +129,25 @@ impl IChunkProvider for DummyChunkProvider {
     }
 
     fn new() -> Self {
-        const chunk_count: usize = 10;
+        const CHUNK_COUNT: usize = 10;
         let image = Image::gen_image_checked(800, 600, 10, 10, Color::BLACK, Color::WHITE);
         let mut sizes = Vec::new();
 
-        for i in 0..chunk_count {
+        for _ in 0..CHUNK_COUNT {
             let w = get_random_value(0, image.width);
             let h = get_random_value(0, image.height);
             sizes.push((w, h));
         }
 
         Self {
-            chunk_count: chunk_count,
+            chunk_count: CHUNK_COUNT,
             done: false,
             _image: Some(image),
             sizes: sizes,
         }
+    }
+
+    fn get_metadata(_: &str) -> Option<ComicMetadata> {
+        None
     }
 }

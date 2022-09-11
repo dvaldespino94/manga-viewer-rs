@@ -1,6 +1,6 @@
 use raylib::texture::Image;
 
-use crate::structs::Chunk;
+use crate::structs::{Chunk, ComicMetadata};
 
 pub trait IChunkProvider {
     fn new() -> Self;
@@ -12,4 +12,6 @@ pub trait IChunkProvider {
     fn destroy(&self);
     fn open(path: &str) -> Self;
     fn get_image(&self, index: usize) -> Option<&Image>;
+
+    fn get_metadata(path: &str) -> Option<ComicMetadata>;
 }
