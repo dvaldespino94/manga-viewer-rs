@@ -34,26 +34,10 @@ impl<'a, T: IChunkProvider> Application<T> {
     }
 
     #[inline]
-    pub fn draw(
-        &mut self,
-        screen_rect: Rectangle,
-        context: &mut RaylibDrawHandle,
-    ) {
-        context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
+    pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        self.handle_input(context);
 
-        context.gui_progress_bar(
-            Rectangle::new(
-                screen_rect.x + 5.0,
-                screen_rect.y + 2.0,
-                screen_rect.width - 10.0,
-                10.0,
-            ),
-            None,
-            None,
-            12.0,
-            0.0,
-            100.0,
-        );
+        context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         let provider = self.provider.as_ref().unwrap();
         let texture: &Option<Texture2D> = if self.textures.contains_key(&self.current_page) {
@@ -67,15 +51,25 @@ impl<'a, T: IChunkProvider> Application<T> {
 
         let chunk = provider.get_chunk(self.current_chunk);
 
-        if texture.is_some() && chunk.is_some() {
-            context.draw_texture_pro(
-                texture.as_ref().unwrap(),
-                chunk.unwrap().rect,
-                screen_rect,
-                Vector2::zero(),
-                0f32,
-                Color::WHITE,
-            )
+        if let Some(t) = texture {
+            if let Some(c) = chunk {
+                let mut target_rect = screen_rect;
+                let coeff = target_rect.width / target_rect.height;
+
+                // target_rect.height -= 50.0;
+                // target_rect.y += 50.0;
+                // target_rect.x+=10.0;
+                // target_rect.width-=10.0;
+
+                context.draw_texture_pro(
+                    texture.as_ref().unwrap(),
+                    c.rect,
+                    target_rect,
+                    Vector2::zero(),
+                    0f32,
+                    Color::WHITE,
+                )
+            }
         } else {
             context.draw_text(
                 "No Texture",
@@ -84,6 +78,47 @@ impl<'a, T: IChunkProvider> Application<T> {
                 14,
                 Color::BLACK,
             );
+        }
+
+        //TODO: Replace progressbar with dot/fraction representation from previous D implementations
+        context.gui_progress_bar(
+            Rectangle::new(
+                screen_rect.x + 5.0,
+                screen_rect.y + 2.0,
+                screen_rect.width - 10.0,
+                10.0,
+            ),
+            None,
+            None,
+            self.current_chunk as f32,
+            0.0,
+            (self.provider.as_ref().unwrap().chunk_count() - 1) as f32,
+        );
+    }
+
+    fn handle_input(&mut self, context: &mut RaylibDrawHandle) {
+        let mut something_changed = false;
+
+        if context.is_key_pressed(KeyboardKey::KEY_PAGE_DOWN)
+            || context.is_key_pressed(KeyboardKey::KEY_RIGHT)
+        {
+            self.current_chunk += 1;
+            something_changed = true;
+        } else if context.is_key_pressed(KeyboardKey::KEY_PAGE_UP)
+            || context.is_key_pressed(KeyboardKey::KEY_LEFT)
+        {
+            if self.current_chunk > 0 {
+                self.current_chunk -= 1;
+            }
+            something_changed = true;
+        }
+
+        if something_changed {
+            if let Some(provider) = self.provider.as_ref() {
+                if self.current_chunk >= provider.chunk_count() {
+                    self.current_chunk = provider.chunk_count() - 1;
+                }
+            }
         }
     }
 }

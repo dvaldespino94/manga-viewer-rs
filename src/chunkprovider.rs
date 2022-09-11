@@ -1,3 +1,4 @@
+use raylib::ffi::rand;
 use raylib::prelude::*;
 
 use crate::structs::Chunk;
@@ -84,40 +85,43 @@ use crate::traits::IChunkProvider;
 // }
 
 pub struct DummyChunkProvider {
-    _chunk_count: usize,
-    _done: bool,
+    chunk_count: usize,
+    done: bool,
     _image: Option<Image>,
+    sizes: Vec<(i32, i32)>,
 }
 
 impl IChunkProvider for DummyChunkProvider {
-    fn get_chunk(&self, _index: usize) -> Option<Chunk> {
+    fn get_chunk(&self, index: usize) -> Option<Chunk> {
         Some(Chunk {
             rect: Rectangle {
                 x: 5.0,
                 y: 5.0,
-                width: 200.0,
-                height: 100.0,
+                width: self.sizes[index].0 as f32,
+                height: self.sizes[index].1 as f32,
             },
+
             texture_index: 0,
             status: crate::structs::ChunkStatus::Ready,
         })
     }
 
     fn chunk_count(&self) -> usize {
-        self._chunk_count
+        self.chunk_count
     }
 
     fn done_processing(&self) -> bool {
-        return self._done;
+        return self.done;
     }
 
     fn destroy(&self) {}
 
     fn open(_path: &str) -> Self {
         return Self {
-            _chunk_count: 0,
-            _done: false,
+            chunk_count: 0,
+            done: false,
             _image: None,
+            sizes: Vec::new(),
         };
     }
 
@@ -126,12 +130,21 @@ impl IChunkProvider for DummyChunkProvider {
     }
 
     fn new() -> Self {
+        const chunk_count: usize = 10;
         let image = Image::gen_image_checked(800, 600, 10, 10, Color::BLACK, Color::WHITE);
+        let mut sizes = Vec::new();
+
+        for i in 0..chunk_count {
+            let w = get_random_value(0, image.width);
+            let h = get_random_value(0, image.height);
+            sizes.push((w, h));
+        }
 
         Self {
-            _chunk_count: 0,
-            _done: false,
+            chunk_count: chunk_count,
+            done: false,
             _image: Some(image),
+            sizes: sizes,
         }
     }
 }
