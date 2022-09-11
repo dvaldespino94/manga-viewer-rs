@@ -11,6 +11,7 @@ pub enum ChunkStatus {
 #[derive(Debug)]
 pub struct Chunk {
     pub rect: Rectangle,
+    pub texture_index: usize,
     pub status: ChunkStatus,
 }
 

@@ -1,5 +1,6 @@
+use std::collections::HashMap;
+
 use crate::chunkprovider::DummyChunkProvider;
-use crate::structs::Chunk;
 use crate::traits::IChunkProvider;
 use raylib::prelude::*;
 
@@ -16,28 +17,74 @@ struct Application<T: IChunkProvider> {
     current_page: usize,
     current_chunk: usize,
     provider: Option<T>,
+    image_queries: Vec<usize>,
+    textures: HashMap<usize, Option<Texture2D>>,
 }
 
-impl<T: IChunkProvider> Application<T> {
+impl<'a, T: IChunkProvider> Application<T> {
     pub fn new() -> Self {
+        let provider: Option<T> = Some(T::new());
         Self {
             current_page: 0,
             current_chunk: 0,
-            provider: None,
+            provider,
+            image_queries: Vec::new(),
+            textures: HashMap::new(),
         }
     }
 
-    pub(crate) fn draw(&self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+    #[inline]
+    pub fn draw(
+        &mut self,
+        screen_rect: Rectangle,
+        context: &mut RaylibDrawHandle,
+    ) {
         context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         context.gui_progress_bar(
-            Rectangle::new(screen_rect.x+5.0, screen_rect.y + 2.0, screen_rect.width-10.0, 10.0),
+            Rectangle::new(
+                screen_rect.x + 5.0,
+                screen_rect.y + 2.0,
+                screen_rect.width - 10.0,
+                10.0,
+            ),
             None,
             None,
             12.0,
             0.0,
             100.0,
         );
+
+        let provider = self.provider.as_ref().unwrap();
+        let texture: &Option<Texture2D> = if self.textures.contains_key(&self.current_page) {
+            // println!("Getting texture from cache!");
+            self.textures.get(&self.current_page).unwrap()
+        } else {
+            // println!("Requesting image {}", self.current_page);
+            self.image_queries.push(self.current_page);
+            &None
+        };
+
+        let chunk = provider.get_chunk(self.current_chunk);
+
+        if texture.is_some() && chunk.is_some() {
+            context.draw_texture_pro(
+                texture.as_ref().unwrap(),
+                chunk.unwrap().rect,
+                screen_rect,
+                Vector2::zero(),
+                0f32,
+                Color::WHITE,
+            )
+        } else {
+            context.draw_text(
+                "No Texture",
+                screen_rect.x as i32 + 10,
+                screen_rect.y as i32 + 10,
+                14,
+                Color::BLACK,
+            );
+        }
     }
 }
 
@@ -46,6 +93,7 @@ fn main() {
     let (mut rl, thread) = init()
         //Set Window Size
         .size(400, 200)
+        //Make window resizable
         .resizable()
         //Set Window Title
         .title("Manga Viewer")
@@ -61,6 +109,17 @@ fn main() {
 
     const PADDING: f32 = 10.0;
     while !rl.window_should_close() {
+        for query in app.image_queries.iter() {
+            println!("Loading texture {:?}", query);
+
+            if let Some(image) = app.provider.as_ref().unwrap().get_image(*query) {
+                let value = Some(rl.load_texture_from_image(&thread, image).unwrap());
+                app.textures.insert(*query, value);
+            }
+        }
+
+        app.image_queries.clear();
+
         let mut context = rl.begin_drawing(&thread);
 
         let screen_rect = Rectangle::new(
