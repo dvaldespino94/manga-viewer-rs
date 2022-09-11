@@ -95,20 +95,52 @@ impl<'a, T: IChunkProvider> Application<T> {
             }
         };
 
-        //TODO: Replace progressbar with dot/fraction representation from previous D implementations
-        context.gui_progress_bar(
-            Rectangle::new(
-                screen_rect.x + 5.0,
-                screen_rect.y + 2.0,
-                screen_rect.width - 10.0,
-                10.0,
-            ),
-            None,
-            None,
-            self.current_chunk as f32,
-            0.0,
-            (self.provider.as_ref().unwrap().chunk_count() - 1) as f32,
-        );
+        //Y position for the indicator
+        let y = screen_rect.y - 2.0 + screen_rect.height;
+        //Available width
+        let available_w = screen_rect.width - 10.0;
+        //Offset between dots
+        let offset = 10.0;
+        //How many dots to draw
+        let chunk_count = provider.chunk_count() as f32;
+
+        //Actual width occupied by the dots
+        let w = (offset) * chunk_count;
+        //Does it fit in the available space?
+        let it_fits = w < available_w;
+
+        //If it does then draw the dots, else draw a fraction
+        if it_fits {
+            //Starting x offset for the dots
+            let x_offset = (screen_rect.x + 5.0 + (available_w - w) / 2.0) as i32;
+
+            for i in 0..(chunk_count as i32) {
+                let (r, color) = if i == (self.current_chunk as i32) {
+                    (4.0, Color::BLUE)
+                } else {
+                    (2.0, Color::GRAY)
+                };
+                context.draw_circle(x_offset + i * (offset) as i32, y as i32, r, color);
+            }
+        } else {
+            //Current chunk (Applying 1-based index offset)
+            let current = self.current_chunk + 1;
+            //Fraction message
+            let fraction = format!("{current:03} / {chunk_count:03}");
+            //Calculate message width
+            let message_width = measure_text(fraction.as_str(), 14);
+            //Starting x offset for fraction
+            let x_offset = screen_rect.x + 5.0 + (available_w - message_width as f32) / 2.0;
+
+            //Draw the fraction message
+            context.draw_text(
+                fraction.as_str(),
+                x_offset as i32,
+                y as i32,
+                14,
+                Color::BLACK,
+            );
+        }
     }
 
     //Handle user input
