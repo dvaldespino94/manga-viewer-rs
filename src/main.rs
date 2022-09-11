@@ -186,6 +186,9 @@ fn main() {
         //Finally call build to get the context initialized
         .build();
 
+    //Set target FPS for the application to 30
+    rl.set_target_fps(30);
+
     //Format the Version string
     let app_version_string = format!(
         "{:}.{:02}.{:02}",
