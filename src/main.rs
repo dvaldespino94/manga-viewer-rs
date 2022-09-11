@@ -69,14 +69,14 @@ impl<'a, T: IChunkProvider> Application<T> {
             //If the texture exists in cache
             if let Some(t) = texture {
                 //Calculate the target rectangle for the texture
-                let mut target_rect = screen_rect;
+                let target_rect = screen_rect;
 
                 //Width/Height Ratio
                 let coeff = target_rect.width / target_rect.height;
 
                 //Draw the texture
                 context.draw_texture_pro(
-                    texture.as_ref().unwrap(),
+                    t,
                     chunk.rect,
                     target_rect,
                     Vector2::zero(),
