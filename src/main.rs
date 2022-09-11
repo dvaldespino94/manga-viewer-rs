@@ -14,7 +14,6 @@ const APP_TITLE: &str = "Manga Viewer";
 const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
 struct Application<T: IChunkProvider> {
-    current_page: usize,
     current_chunk: usize,
     provider: Option<T>,
     image_queries: Vec<usize>,
@@ -25,7 +24,6 @@ impl<'a, T: IChunkProvider> Application<T> {
     pub fn new() -> Self {
         let provider: Option<T> = Some(T::new());
         Self {
-            current_page: 0,
             current_chunk: 0,
             provider,
             image_queries: Vec::new(),
@@ -40,45 +38,38 @@ impl<'a, T: IChunkProvider> Application<T> {
         context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         let provider = self.provider.as_ref().unwrap();
-        let texture: &Option<Texture2D> = if self.textures.contains_key(&self.current_page) {
-            // println!("Getting texture from cache!");
-            self.textures.get(&self.current_page).unwrap()
-        } else {
-            // println!("Requesting image {}", self.current_page);
-            self.image_queries.push(self.current_page);
-            &None
-        };
+        if let Some(chunk) = provider.get_chunk(self.current_chunk) {
+            let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
+                // println!("Getting texture from cache!");
+                self.textures.get(&chunk.texture_index).unwrap()
+            } else {
+                // println!("Requesting image {}", chunk.texture_index);
+                self.image_queries.push(chunk.texture_index);
+                &None
+            };
 
-        let chunk = provider.get_chunk(self.current_chunk);
-
-        if let Some(t) = texture {
-            if let Some(c) = chunk {
+            if let Some(t) = texture {
                 let mut target_rect = screen_rect;
                 let coeff = target_rect.width / target_rect.height;
 
-                // target_rect.height -= 50.0;
-                // target_rect.y += 50.0;
-                // target_rect.x+=10.0;
-                // target_rect.width-=10.0;
-
                 context.draw_texture_pro(
                     texture.as_ref().unwrap(),
-                    c.rect,
+                    chunk.rect,
                     target_rect,
                     Vector2::zero(),
                     0f32,
                     Color::WHITE,
                 )
+            } else {
+                context.draw_text(
+                    "No Texture",
+                    screen_rect.x as i32 + 10,
+                    screen_rect.y as i32 + 10,
+                    14,
+                    Color::BLACK,
+                );
             }
-        } else {
-            context.draw_text(
-                "No Texture",
-                screen_rect.x as i32 + 10,
-                screen_rect.y as i32 + 10,
-                14,
-                Color::BLACK,
-            );
-        }
+        };
 
         //TODO: Replace progressbar with dot/fraction representation from previous D implementations
         context.gui_progress_bar(
