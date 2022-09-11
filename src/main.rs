@@ -87,10 +87,21 @@ impl<'a, T: IChunkProvider> Application<T> {
                 //Width/Height Ratio
                 let coeff = chunk.rect.height / chunk.rect.width;
 
+                //Does the chunk fits in the screen?
+                let chunk_real_height = screen_rect.width * coeff;
+                let chunk_fits = chunk_real_height <= screen_rect.height;
+
                 //Calculate the target rectangle for the texture
                 let target_rect = Rectangle::new(
                     screen_rect.x,
-                    screen_rect.y + self.smoothed_scroll,
+                    if chunk_fits {
+                        //If fits center the chunk vertically
+                        (screen_rect.height - chunk_real_height) / 2.0
+                    } else {
+                        //Else start at screen_rect's beginning
+                        0.0
+                    } + screen_rect.y
+                        + self.smoothed_scroll,
                     screen_rect.width,
                     screen_rect.width * coeff,
                 );
