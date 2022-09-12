@@ -64,6 +64,10 @@ impl IChunkProvider for DirChunkProvider {
     fn get_image(&mut self, index: usize) -> Option<&raylib::texture::Image> {
         println!("Getting image {}", index);
 
+        if index >= self.files.len(){
+            return None
+        }
+
         if self.images.contains_key(&index) {
             return self.images.get(&index);
         }

@@ -1,4 +1,4 @@
-use std::{ffi::CString, fs::OpenOptions, io::Write, path::Path, collections::HashMap};
+use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
 use raylib::prelude::*;
 
@@ -22,6 +22,8 @@ pub struct Application<T: IChunkProvider> {
     smoothed_scroll: f32,
     //Recent documents list
     recent_documents: Vec<String>,
+    //Texture indexes in the order they were loaded
+    texture_loading_order: Vec<usize>,
 }
 
 //TODO: Keep textures hash as light as possible, freeing non used textures
@@ -49,6 +51,28 @@ impl<'a, T: IChunkProvider> Application<T> {
             } else {
                 Vec::new()
             },
+            texture_loading_order: Vec::new(),
+        }
+    }
+
+    pub fn load_textures(&mut self, context: &mut RaylibHandle, thread: &RaylibThread) {
+        //Check for texture queries
+        for query in self.image_queries.iter() {
+            println!("Loading texture {:?}", query);
+
+            //Try to get the image from the provider
+            if let Some(image) = self.provider.as_mut().unwrap().get_image(*query) {
+                //Get the texture from the image
+                let value = Some(context.load_texture_from_image(thread, image).unwrap());
+                //Insert the texture into the app's index/texture hash
+                self.textures.insert(*query, value);
+
+                if self.textures.len() >= 4 {
+                    self.textures.remove(&self.texture_loading_order.pop().unwrap());
+                }
+
+                self.texture_loading_order.insert(0, *query);
+            }
         }
     }
 

@@ -47,18 +47,7 @@ fn main() {
 
     //RayLib's mainloop
     while !rl.borrow_mut().window_should_close() {
-        //Check for texture queries
-        for query in app.image_queries.iter() {
-            println!("Loading texture {:?}", query);
-
-            //Try to get the image from the provider
-            if let Some(image) = app.provider.as_mut().unwrap().get_image(*query) {
-                //Get the texture from the image
-                let value = Some(rl.load_texture_from_image(&thread, image).unwrap());
-                //Insert the texture into the app's index/texture hash
-                app.textures.insert(*query, value);
-            }
-        }
+        app.load_textures(rl.borrow_mut(), &thread);
 
         //Clear query vec
         app.image_queries.clear();
