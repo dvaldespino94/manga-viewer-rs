@@ -5,6 +5,7 @@ use application::Application;
 use raylib::prelude::*;
 use traits::IChunkProvider;
 
+pub mod processing;
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
@@ -51,7 +52,7 @@ fn main() {
             println!("Loading texture {:?}", query);
 
             //Try to get the image from the provider
-            if let Some(image) = app.provider.as_ref().unwrap().get_image(*query) {
+            if let Some(image) = app.provider.as_mut().unwrap().get_image(*query) {
                 //Get the texture from the image
                 let value = Some(rl.load_texture_from_image(&thread, image).unwrap());
                 //Insert the texture into the app's index/texture hash

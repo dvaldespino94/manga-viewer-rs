@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
+use std::{ffi::CString, fs::OpenOptions, io::Write, path::Path, collections::HashMap};
 
 use raylib::prelude::*;
 
@@ -47,7 +47,7 @@ impl<'a, T: IChunkProvider> Application<T> {
                     .filter(|x| Path::new(x).exists())
                     .collect()
             } else {
-                [String::from("test"), String::from("test2")].to_vec()
+                Vec::new()
             },
         }
     }
@@ -68,10 +68,18 @@ impl<'a, T: IChunkProvider> Application<T> {
         context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
-        let provider = self.provider.as_ref().unwrap();
+        let provider = self.provider.as_mut().unwrap();
 
         //Store current chunk in cache
-        self.current_chunk = provider.get_chunk(self.current_chunk_index);
+        self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
+            Some(Chunk {
+                rect: c.rect,
+                texture_index: c.texture_index,
+                status: crate::structs::ChunkStatus::Ready,
+            })
+        } else {
+            None
+        };
 
         //If a chunk has been retrieved from the provider
         if let Some(chunk) = &self.current_chunk {
@@ -286,6 +294,10 @@ impl<'a, T: IChunkProvider> Application<T> {
         screen_rect: Rectangle,
         context: &mut RaylibDrawHandle,
     ) -> bool {
+        if self.provider.as_ref().unwrap().chunk_count() > 0 {
+            return false;
+        }
+
         if self.recent_documents.len() == 0 {
             draw_text_centered(
                 context,

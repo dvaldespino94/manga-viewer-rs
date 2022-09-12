@@ -1,11 +1,14 @@
-use raylib::prelude::Image;
+use crate::{
+    archive::{ArEntryInfo, Archive},
+    structs::{Chunk, ChunkStatus},
+};
 use raylib::math::Rectangle;
+use raylib::prelude::Image;
 use rusqlite::Connection;
-use crate::{Archive, ArEntryInfo, Chunk, ChunkStatus};
 
 //Get chunk metadata from image
 #[allow(unused)]
-fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
+pub fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
     //How many white strips counts as a chunk separator
     const WHITE_STRIP_THRESHOLD: usize = 5;
 
@@ -64,9 +67,15 @@ fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
                 let height = y - last_chunk_start;
                 chunks.push(Chunk {
                     status: ChunkStatus::Idle,
-                    rect: Rectangle::new(0.0, last_chunk_start as f32, image.width as f32, height as f32),
+                    rect: Rectangle::new(
+                        0.0,
+                        last_chunk_start as f32,
+                        image.width as f32,
+                        height as f32,
+                    ),
+                    texture_index: 0,
                 });
-                last_chunk_start = y+1;
+                last_chunk_start = y + 1;
             } else {
                 //Register that a chunk started here
                 last_chunk_start = y;
@@ -79,27 +88,15 @@ fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
         //Increment y
         y += 1;
     }
-    //If last strip was true then add the last part as a chunk
-    if *white_strip_map.last().unwrap() {
-        chunks.push(Chunk {
-            status: ChunkStatus::Idle,
-            rect: Rectangle::new(
-                0.0,
-                last_chunk_start as f32,
-                image.width as f32,
-                (image.height - last_chunk_start as i32) as f32,
-            ),
-        })
-    }
 
-    return chunks.into_iter().filter(|x| x.rect.height > (MIN_CHUNK_HEIGHT as f32)).collect();
+    return chunks
+        .into_iter()
+        .filter(|x| x.rect.height > (MIN_CHUNK_HEIGHT as f32))
+        .collect();
 }
 
 #[allow(unused)]
-pub fn process_page<'a>(
-    archive: Archive,
-    entry: &ArEntryInfo,
-) -> Vec<Chunk> {
+pub fn process_page<'a>(archive: Archive, entry: &ArEntryInfo) -> Vec<Chunk> {
     let data = archive
         .read(entry.offset, entry.size)
         .expect("Error getting image data");
@@ -124,14 +121,18 @@ fn extract_metadata(archive: &mut Archive) {
     let mut chunk_index = 0;
 
     let mut db = Connection::open("data.sqlite").expect("Error opening connection with database");
-    db.execute("CREATE TABLE IF NOT EXISTS Chunks(\
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS Chunks(\
         id INTEGER PRIMARY KEY,\
         page INTEGER,\
         x INTEGER,\
         y INTEGER,\
         w INTEGER,\
         h INTEGER\
-    )", []).expect("Error creating table");
+    )",
+        [],
+    )
+    .expect("Error creating table");
 
     match archive.next() {
         Some(page) => {
@@ -140,9 +141,18 @@ fn extract_metadata(archive: &mut Archive) {
             for chunk in chunks.iter() {
                 let tx = db.transaction().expect("Error starting transaction!");
 
-                tx.execute("INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);", [
-                    chunk_index, page_index, chunk.rect.x as i32, chunk.rect.y as i32, chunk.rect.width as i32, chunk.rect.height as i32
-                ]).expect("Error inserting Chunk into DB");
+                tx.execute(
+                    "INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);",
+                    [
+                        chunk_index,
+                        page_index,
+                        chunk.rect.x as i32,
+                        chunk.rect.y as i32,
+                        chunk.rect.width as i32,
+                        chunk.rect.height as i32,
+                    ],
+                )
+                .expect("Error inserting Chunk into DB");
 
                 tx.commit().expect("Error commiting transaction");
 
