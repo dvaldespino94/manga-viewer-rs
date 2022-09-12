@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 raylib = "3.7.0"
-rusqlite = "0.28.0"
-toml = "0.5.9"
+# rusqlite = "0.28.0"
+# toml = "0.5.9"
 libc = "0.2.132"

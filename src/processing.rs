@@ -4,7 +4,6 @@ use crate::{
 };
 use raylib::math::Rectangle;
 use raylib::prelude::Image;
-use rusqlite::Connection;
 
 //Get chunk metadata from image
 #[allow(unused)]
@@ -115,52 +114,52 @@ pub fn process_page<'a>(archive: Archive, entry: &ArEntryInfo) -> Vec<Chunk> {
     Vec::new()
 }
 
-#[allow(unused)]
-fn extract_metadata(archive: &mut Archive) {
-    let mut page_index = 0;
-    let mut chunk_index = 0;
+// #[allow(unused)]
+// fn extract_metadata(archive: &mut Archive) {
+//     let mut page_index = 0;
+//     let mut chunk_index = 0;
 
-    let mut db = Connection::open("data.sqlite").expect("Error opening connection with database");
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS Chunks(\
-        id INTEGER PRIMARY KEY,\
-        page INTEGER,\
-        x INTEGER,\
-        y INTEGER,\
-        w INTEGER,\
-        h INTEGER\
-    )",
-        [],
-    )
-    .expect("Error creating table");
+//     let mut db = Connection::open("data.sqlite").expect("Error opening connection with database");
+//     db.execute(
+//         "CREATE TABLE IF NOT EXISTS Chunks(\
+//         id INTEGER PRIMARY KEY,\
+//         page INTEGER,\
+//         x INTEGER,\
+//         y INTEGER,\
+//         w INTEGER,\
+//         h INTEGER\
+//     )",
+//         [],
+//     )
+//     .expect("Error creating table");
 
-    match archive.next() {
-        Some(page) => {
-            let chunks = process_page(*archive, &page);
+//     match archive.next() {
+//         Some(page) => {
+//             let chunks = process_page(*archive, &page);
 
-            for chunk in chunks.iter() {
-                let tx = db.transaction().expect("Error starting transaction!");
+//             for chunk in chunks.iter() {
+//                 let tx = db.transaction().expect("Error starting transaction!");
 
-                tx.execute(
-                    "INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);",
-                    [
-                        chunk_index,
-                        page_index,
-                        chunk.rect.x as i32,
-                        chunk.rect.y as i32,
-                        chunk.rect.width as i32,
-                        chunk.rect.height as i32,
-                    ],
-                )
-                .expect("Error inserting Chunk into DB");
+//                 tx.execute(
+//                     "INSERT INTO Chunks VALUES(?, ?, ?, ?, ?, ?);",
+//                     [
+//                         chunk_index,
+//                         page_index,
+//                         chunk.rect.x as i32,
+//                         chunk.rect.y as i32,
+//                         chunk.rect.width as i32,
+//                         chunk.rect.height as i32,
+//                     ],
+//                 )
+//                 .expect("Error inserting Chunk into DB");
 
-                tx.commit().expect("Error commiting transaction");
+//                 tx.commit().expect("Error commiting transaction");
 
-                chunk_index += 1;
-            }
+//                 chunk_index += 1;
+//             }
 
-            page_index += 1;
-        }
-        None => return,
-    };
-}
+//             page_index += 1;
+//         }
+//         None => return,
+//     };
+// }

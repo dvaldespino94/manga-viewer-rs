@@ -89,7 +89,7 @@ impl<'a, T: IChunkProvider> Application<T> {
         self.smoothed_scroll += (self.scroll - self.smoothed_scroll) * 0.3;
 
         //Draw borders(this is intended for debugging only)
-        context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
+        // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
         let provider = self.provider.as_mut().unwrap();

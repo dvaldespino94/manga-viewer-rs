@@ -3,7 +3,6 @@ use std::borrow::BorrowMut;
 use crate::dirchunkprovider::DirChunkProvider;
 use application::Application;
 use raylib::prelude::*;
-use traits::IChunkProvider;
 
 pub mod processing;
 pub mod application;
@@ -70,7 +69,7 @@ fn main() {
             );
 
             //Clear the screen's background
-            context.clear_background(Color::LIGHTGRAY);
+            context.clear_background(Color::WHITE);
 
             //Draw the application
             app.draw(screen_rect, &mut context);
