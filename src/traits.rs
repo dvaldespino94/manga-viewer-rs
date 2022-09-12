@@ -10,7 +10,7 @@ pub trait IChunkProvider {
     fn done_processing(&self) -> bool;
 
     fn destroy(&self);
-    fn open(path: &str) -> Self;
+    fn open(&self, path: &str) -> bool;
     fn get_image(&self, index: usize) -> Option<&Image>;
 
     fn get_metadata(path: &str) -> Option<ComicMetadata>;

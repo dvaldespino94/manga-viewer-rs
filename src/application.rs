@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::OpenOptions, io::Write, path::Path};
 
 use raylib::prelude::*;
 
@@ -20,6 +20,8 @@ pub struct Application<T: IChunkProvider> {
     scroll: f32,
     //Smoothed scroll offset
     smoothed_scroll: f32,
+    //Recent documents list
+    recent_documents: Vec<String>,
 }
 
 //TODO: Keep textures hash as light as possible, freeing non used textures
@@ -38,12 +40,25 @@ impl<'a, T: IChunkProvider> Application<T> {
             textures: HashMap::new(),
             scroll: 0.0,
             smoothed_scroll: 0.0,
+            //Load recent files from 'recent.txt'
+            recent_documents: if let Ok(text) = std::fs::read_to_string("recent.txt") {
+                text.split("\n")
+                    .map(|x| String::from(x))
+                    .filter(|x| Path::new(x).exists())
+                    .collect()
+            } else {
+                [String::from("test"), String::from("test2")].to_vec()
+            },
         }
     }
 
     #[inline]
     //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        if self.handle_open_document(screen_rect, context) {
+            return;
+        }
+
         //Handle user input
         self.handle_input(context, &screen_rect);
 
@@ -245,4 +260,71 @@ impl<'a, T: IChunkProvider> Application<T> {
             self.smoothed_scroll = -real_size.y;
         }
     }
+
+    fn handle_open_document(&self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) -> bool {
+        // Handle file dropping
+        if context.is_file_dropped() {
+            let path = context.get_dropped_files()[0].clone();
+            let result = self
+                .provider
+                .as_ref()
+                .expect("There is no provider!")
+                .open(path.as_str());
+            if result {
+                if let Ok(mut f) = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open("recent.txt")
+                {
+                    f.write_all(path.as_bytes())
+                        .expect("Error writing path to file");
+                    f.write_all("\n".as_bytes())
+                        .expect("Error writing new line to file");
+                }
+            }
+        }
+
+        if self.recent_documents.len() == 0 {
+            draw_text_centered(
+                context,
+                "No Recent documents",
+                screen_rect,
+                14,
+                Color::BLACK,
+            );
+        } else {
+            context.draw_text(
+                "Recent documents:",
+                screen_rect.x as i32 + 5,
+                screen_rect.y as i32,
+                14,
+                Color::BLACK,
+            );
+
+            for i in 0..self.recent_documents.len() {
+                context.draw_text(
+                    self.recent_documents[i].as_str(),
+                    screen_rect.x as i32 + 5,
+                    20 + screen_rect.y as i32 + i as i32 * 20,
+                    13,
+                    Color::DARKGRAY,
+                );
+            }
+        }
+
+        return true;
+    }
+}
+
+fn draw_text_centered(
+    context: &mut RaylibDrawHandle,
+    text: &str,
+    rect: Rectangle,
+    font_size: i32,
+    color: Color,
+) {
+    let text_width = measure_text(text, font_size);
+    let x = rect.x + (rect.width - text_width as f32) / 2.0;
+    let y = rect.y + (rect.height - font_size as f32) / 2.0;
+    context.draw_text(text, x as i32, y as i32, font_size, color)
 }

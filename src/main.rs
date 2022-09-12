@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use crate::chunkprovider::DummyChunkProvider;
 use application::Application;
 use raylib::prelude::*;
@@ -40,8 +42,9 @@ fn main() {
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;
+
     //RayLib's mainloop
-    while !rl.window_should_close() {
+    while !rl.borrow_mut().window_should_close() {
         //Check for texture queries
         for query in app.image_queries.iter() {
             println!("Loading texture {:?}", query);

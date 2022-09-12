@@ -115,13 +115,8 @@ impl IChunkProvider for DummyChunkProvider {
 
     fn destroy(&self) {}
 
-    fn open(_path: &str) -> Self {
-        return Self {
-            chunk_count: 0,
-            done: false,
-            _image: None,
-            sizes: Vec::new(),
-        };
+    fn open(&self, _path: &str) -> bool {
+        return true;
     }
 
     fn get_image(&self, _index: usize) -> Option<&Image> {
@@ -148,6 +143,10 @@ impl IChunkProvider for DummyChunkProvider {
     }
 
     fn get_metadata(_: &str) -> Option<ComicMetadata> {
-        None
+        Some(ComicMetadata {
+            title: "Some Comic".to_string(),
+            chunk_count: 10,
+            last_seen_chunk: 2,
+        })
     }
 }
