@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 
-use crate::chunkprovider::DummyChunkProvider;
+use crate::dirchunkprovider::DirChunkProvider;
 use application::Application;
 use raylib::prelude::*;
 use traits::IChunkProvider;
@@ -8,6 +8,7 @@ use traits::IChunkProvider;
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
+pub mod dirchunkprovider;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
@@ -38,7 +39,7 @@ fn main() {
     );
 
     //Instantiate the application
-    let mut app: Application<DummyChunkProvider> = Application::new();
+    let mut app: Application<DirChunkProvider> = Application::new();
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;
@@ -61,25 +62,32 @@ fn main() {
         //Clear query vec
         app.image_queries.clear();
 
-        //Get the RL Context
-        let mut context = rl.begin_drawing(&thread);
+        if rl.is_file_dropped() {
+            app.handle_dropped_document(rl.get_dropped_files()[0].to_string());
+            rl.clear_dropped_files();
+        }
 
-        //Cache screen rectangle, adding offsets and correcting width/height
-        let screen_rect = Rectangle::new(
-            PADDING,
-            PADDING + 30f32,
-            context.get_screen_width() as f32 - 2f32 * PADDING,
-            context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
-        );
+        {
+            //Get the RL Context
+            let mut context = rl.begin_drawing(&thread);
 
-        //Clear the screen's background
-        context.clear_background(Color::LIGHTGRAY);
+            //Cache screen rectangle, adding offsets and correcting width/height
+            let screen_rect = Rectangle::new(
+                PADDING,
+                PADDING + 30f32,
+                context.get_screen_width() as f32 - 2f32 * PADDING,
+                context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
+            );
 
-        //Draw the application
-        app.draw(screen_rect, &mut context);
+            //Clear the screen's background
+            context.clear_background(Color::LIGHTGRAY);
 
-        //Draw the header and version
-        context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
-        context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
+            //Draw the application
+            app.draw(screen_rect, &mut context);
+
+            //Draw the header and version
+            context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
+            context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
+        }
     }
 }

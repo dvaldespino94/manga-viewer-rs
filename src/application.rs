@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::OpenOptions, io::Write, path::Path};
+use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
 use raylib::prelude::*;
 
@@ -261,29 +261,31 @@ impl<'a, T: IChunkProvider> Application<T> {
         }
     }
 
-    fn handle_open_document(&self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) -> bool {
-        // Handle file dropping
-        if context.is_file_dropped() {
-            let path = context.get_dropped_files()[0].clone();
-            let result = self
-                .provider
-                .as_ref()
-                .expect("There is no provider!")
-                .open(path.as_str());
-            if result {
-                if let Ok(mut f) = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open("recent.txt")
-                {
-                    f.write_all(path.as_bytes())
-                        .expect("Error writing path to file");
-                    f.write_all("\n".as_bytes())
-                        .expect("Error writing new line to file");
-                }
+    pub fn handle_dropped_document(&mut self, path: String) {
+        let result = self
+            .provider
+            .as_mut()
+            .expect("There is no provider!")
+            .open(path.as_str());
+        if result {
+            if let Ok(mut f) = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open("recent.txt")
+            {
+                f.write_all(path.as_bytes())
+                    .expect("Error writing path to file");
+                f.write_all("\n".as_bytes())
+                    .expect("Error writing new line to file");
             }
         }
+    }
 
+    fn handle_open_document(
+        &mut self,
+        screen_rect: Rectangle,
+        context: &mut RaylibDrawHandle,
+    ) -> bool {
         if self.recent_documents.len() == 0 {
             draw_text_centered(
                 context,
@@ -302,13 +304,24 @@ impl<'a, T: IChunkProvider> Application<T> {
             );
 
             for i in 0..self.recent_documents.len() {
-                context.draw_text(
-                    self.recent_documents[i].as_str(),
-                    screen_rect.x as i32 + 5,
-                    20 + screen_rect.y as i32 + i as i32 * 20,
-                    13,
-                    Color::DARKGRAY,
-                );
+                if context.gui_button(
+                    Rectangle::new(
+                        screen_rect.x + 5.0,
+                        20.0 + screen_rect.y + i as f32 * 20.0,
+                        screen_rect.width - 10.0,
+                        15.0,
+                    ),
+                    Some(
+                        CString::new(self.recent_documents[i].as_str())
+                            .unwrap()
+                            .as_c_str(),
+                    ),
+                ) {
+                    self.provider
+                        .as_mut()
+                        .unwrap()
+                        .open(&self.recent_documents[i]);
+                }
             }
         }
 

@@ -115,7 +115,7 @@ impl IChunkProvider for DummyChunkProvider {
 
     fn destroy(&self) {}
 
-    fn open(&self, _path: &str) -> bool {
+    fn open(&mut self, _path: &str) -> bool {
         return true;
     }
 

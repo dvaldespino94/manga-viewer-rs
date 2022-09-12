@@ -30,7 +30,7 @@ pub enum Message {
 
 //Store metadata for books, folders, etc...
 #[derive(Debug)]
-pub struct ComicMetadata{
+pub struct ComicMetadata {
     //The comic's title
     pub title: String,
     //How many chunks were found last time(Might increase)
