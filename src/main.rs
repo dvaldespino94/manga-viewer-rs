@@ -1,6 +1,5 @@
 use std::borrow::BorrowMut;
 
-use crate::dirchunkprovider::DirChunkProvider;
 use application::Application;
 use raylib::prelude::*;
 
@@ -39,7 +38,7 @@ fn main() {
     );
 
     //Instantiate the application
-    let mut app: Application<DirChunkProvider> = Application::new();
+    let mut app: Application = Application::new();
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;

@@ -12,11 +12,13 @@ pub struct DirChunkProvider {
     last_loaded_image: i32,
 }
 
-impl IChunkProvider for DirChunkProvider {
-    fn new() -> Self {
+impl DirChunkProvider {
+    pub fn new() -> Self {
         Self::default()
     }
+}
 
+impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
         if index >= self.chunks.len() {
             self.last_loaded_image += 1;
@@ -99,7 +101,7 @@ impl IChunkProvider for DirChunkProvider {
         self.images.get(&index)
     }
 
-    fn get_metadata(_path: &str) -> Option<crate::structs::ComicMetadata> {
+    fn get_metadata(&self, _path: &str) -> Option<crate::structs::ComicMetadata> {
         None
     }
 }

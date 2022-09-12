@@ -2,16 +2,16 @@ use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::
 
 use raylib::prelude::*;
 
-use crate::{structs::Chunk, traits::IChunkProvider};
+use crate::{dirchunkprovider::DirChunkProvider, structs::Chunk, traits::IChunkProvider};
 
 //Main Application class, holds viewer state and provider
-pub struct Application<T: IChunkProvider> {
+pub struct Application {
     //Current chunk index
     current_chunk_index: usize,
     //Current chunk cached instance
     current_chunk: Option<Chunk>,
     //Chunk/Texture provider
-    pub provider: Option<T>,
+    pub provider: Box<dyn IChunkProvider>,
     //Images to be converted into textures
     pub image_queries: Vec<usize>,
     //Hash keeping the textures
@@ -27,11 +27,11 @@ pub struct Application<T: IChunkProvider> {
 }
 
 //TODO: Keep textures hash as light as possible, freeing non used textures
-impl<'a, T: IChunkProvider> Application<T> {
-    /// Creates a new [`Application<T>`].
+impl<'a> Application {
+    /// Creates a new [`Application`].
     pub fn new() -> Self {
         //Instantiate the provider
-        let provider: Option<T> = Some(T::new());
+        let provider = Box::new(DirChunkProvider::new());
 
         //Return a new application
         Self {
@@ -61,14 +61,15 @@ impl<'a, T: IChunkProvider> Application<T> {
             println!("Loading texture {:?}", query);
 
             //Try to get the image from the provider
-            if let Some(image) = self.provider.as_mut().unwrap().get_image(*query) {
+            if let Some(image) = self.provider.as_mut().get_image(*query) {
                 //Get the texture from the image
                 let value = Some(context.load_texture_from_image(thread, image).unwrap());
                 //Insert the texture into the app's index/texture hash
                 self.textures.insert(*query, value);
 
                 if self.textures.len() >= 4 {
-                    self.textures.remove(&self.texture_loading_order.pop().unwrap());
+                    self.textures
+                        .remove(&self.texture_loading_order.pop().unwrap());
                 }
 
                 self.texture_loading_order.insert(0, *query);
@@ -92,7 +93,7 @@ impl<'a, T: IChunkProvider> Application<T> {
         // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
-        let provider = self.provider.as_mut().unwrap();
+        let provider = self.provider.as_mut();
 
         //Store current chunk in cache
         self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
@@ -279,10 +280,9 @@ impl<'a, T: IChunkProvider> Application<T> {
 
         //Keep current_chunk into bounds
         if something_changed {
-            if let Some(provider) = self.provider.as_ref() {
-                if self.current_chunk_index >= provider.chunk_count() {
-                    self.current_chunk_index = provider.chunk_count() - 1;
-                }
+            let provider = self.provider.as_ref();
+            if self.current_chunk_index >= provider.chunk_count() {
+                self.current_chunk_index = provider.chunk_count() - 1;
             }
         }
 
@@ -294,11 +294,7 @@ impl<'a, T: IChunkProvider> Application<T> {
     }
 
     pub fn handle_dropped_document(&mut self, path: String) {
-        let result = self
-            .provider
-            .as_mut()
-            .expect("There is no provider!")
-            .open(path.as_str());
+        let result = self.provider.as_mut().open(path.as_str());
         if result {
             if let Ok(mut f) = OpenOptions::new()
                 .append(true)
@@ -318,7 +314,7 @@ impl<'a, T: IChunkProvider> Application<T> {
         screen_rect: Rectangle,
         context: &mut RaylibDrawHandle,
     ) -> bool {
-        if self.provider.as_ref().unwrap().chunk_count() > 0 {
+        if self.provider.as_ref().chunk_count() > 0 {
             return false;
         }
 
@@ -353,10 +349,7 @@ impl<'a, T: IChunkProvider> Application<T> {
                             .as_c_str(),
                     ),
                 ) {
-                    self.provider
-                        .as_mut()
-                        .unwrap()
-                        .open(&self.recent_documents[i]);
+                    self.provider.as_mut().open(&self.recent_documents[i]);
                 }
             }
         }
