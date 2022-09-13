@@ -2,16 +2,16 @@ use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::
 
 use raylib::prelude::*;
 
-use crate::{dirchunkprovider::DirChunkProvider, structs::Chunk, traits::IChunkProvider};
+use crate::{structs::Chunk, traits::IChunkProvider};
 
 //Main Application class, holds viewer state and provider
-pub struct Application {
+pub struct Application<'a> {
     //Current chunk index
     current_chunk_index: usize,
     //Current chunk cached instance
     current_chunk: Option<Chunk>,
     //Chunk/Texture provider
-    pub provider: Option<Box<dyn IChunkProvider>>,
+    pub provider: Option<Box<&'a mut dyn IChunkProvider>>,
     //Images to be converted into textures
     pub image_queries: Vec<usize>,
     //Hash keeping the textures
@@ -24,19 +24,18 @@ pub struct Application {
     recent_documents: Vec<String>,
     //Texture indexes in the order they were loaded
     texture_loading_order: Vec<usize>,
+    //Error messages
+    pub errors: Vec<(String, String, Option<fn()>)>,
 }
 
 //TODO: Keep textures hash as light as possible, freeing non used textures
-impl<'a> Application {
+impl<'a> Application<'a> {
     /// Creates a new [`Application`].
     pub fn new() -> Self {
-        //Instantiate the provider
-        let provider = DirChunkProvider::new();
-
         //Return a new application
         Self {
             current_chunk_index: 0,
-            provider: Some(Box::new(provider)),
+            provider: None,
             current_chunk: None,
             image_queries: Vec::new(),
             textures: HashMap::new(),
@@ -52,6 +51,7 @@ impl<'a> Application {
                 Vec::new()
             },
             texture_loading_order: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -60,19 +60,21 @@ impl<'a> Application {
         for query in self.image_queries.iter() {
             println!("Loading texture {:?}", query);
 
-            //Try to get the image from the provider
-            if let Some(image) = self.provider.as_mut().expect("Error getting provider").get_image(*query) {
-                //Get the texture from the image
-                let value = Some(context.load_texture_from_image(thread, image).unwrap());
-                //Insert the texture into the app's index/texture hash
-                self.textures.insert(*query, value);
+            if let Some(provider) = self.provider.as_mut() {
+                //Try to get the image from the provider
+                if let Some(image) = provider.get_image(*query) {
+                    //Get the texture from the image
+                    let value = Some(context.load_texture_from_image(thread, image).unwrap());
+                    //Insert the texture into the app's index/texture hash
+                    self.textures.insert(*query, value);
 
-                if self.textures.len() >= 4 {
-                    self.textures
-                        .remove(&self.texture_loading_order.pop().unwrap());
+                    if self.textures.len() >= 4 {
+                        self.textures
+                            .remove(&self.texture_loading_order.pop().unwrap());
+                    }
+
+                    self.texture_loading_order.insert(0, *query);
                 }
-
-                self.texture_loading_order.insert(0, *query);
             }
         }
     }
@@ -80,6 +82,31 @@ impl<'a> Application {
     #[inline]
     //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        if self.errors.len() > 0 {
+            let err = self.errors.get(0).unwrap();
+            let mut title_rect = screen_rect;
+            let mut message_rect = screen_rect;
+            let mut button_rect = screen_rect;
+
+            title_rect.height = 30.0;
+            message_rect.height -= 50.0;
+            message_rect.y += 30.0;
+            button_rect.y = screen_rect.y + screen_rect.height - 20.0;
+            button_rect.height = 20.0;
+            button_rect.x = screen_rect.x + screen_rect.width / 3.0;
+            button_rect.width = screen_rect.width / 3.0;
+
+            draw_text_centered(context, err.0.as_str(), title_rect, 14, Color::RED);
+            draw_text_centered(context, err.1.as_str(), message_rect, 12, Color::RED);
+            if context.gui_button(
+                button_rect,
+                Some(CString::new("Dismiss").unwrap().as_c_str()),
+            ) {
+                self.errors.remove(0);
+            }
+            return;
+        }
+
         if self.handle_open_document(screen_rect, context) {
             return;
         }
@@ -93,18 +120,18 @@ impl<'a> Application {
         // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
-        let provider = self.provider.as_mut();
-
-        //Store current chunk in cache
-        self.current_chunk = if let Some(c) = provider.expect("Error getting provider").get_chunk(self.current_chunk_index) {
-            Some(Chunk {
-                rect: c.rect,
-                texture_index: c.texture_index,
-                status: crate::structs::ChunkStatus::Ready,
-            })
-        } else {
-            None
-        };
+        if let Some(provider) = self.provider.as_mut() {
+            //Store current chunk in cache
+            self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
+                Some(Chunk {
+                    rect: c.rect,
+                    texture_index: c.texture_index,
+                    status: crate::structs::ChunkStatus::Ready,
+                })
+            } else {
+                None
+            };
+        }
 
         //If a chunk has been retrieved from the provider
 
@@ -167,7 +194,11 @@ impl<'a> Application {
         //Offset between dots
         let offset = 10.0;
         //How many dots to draw
-        let chunk_count = self.provider.as_mut().expect("Error getting provider").chunk_count() as f32;
+        let chunk_count = if let Some(provider) = self.provider.as_mut() {
+            provider.chunk_count() as f32
+        } else {
+            0.0
+        };
 
         //Actual width occupied by the dots
         let w = (offset) * chunk_count;
@@ -275,7 +306,7 @@ impl<'a> Application {
 
         //Keep current_chunk into bounds
         if something_changed {
-            if let Some(provider) = self.provider.as_ref(){
+            if let Some(provider) = self.provider.as_ref() {
                 if self.current_chunk_index >= provider.chunk_count() {
                     self.current_chunk_index = provider.chunk_count() - 1;
                 }
@@ -290,18 +321,23 @@ impl<'a> Application {
     }
 
     pub fn handle_dropped_document(&mut self, path: String) {
-        let result = self.provider.as_mut().expect("Error getting provider").open(path.as_str());
-        if result {
-            if let Ok(mut f) = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open("recent.txt")
-            {
-                f.write_all(path.as_bytes())
-                    .expect("Error writing path to file");
-                f.write_all("\n".as_bytes())
-                    .expect("Error writing new line to file");
+        if let Some(provider) = self.provider.as_mut() {
+            if provider.open(path.as_str()) {
+                if let Ok(mut f) = OpenOptions::new()
+                    .append(true)
+                    .create(true)
+                    .open("recent.txt")
+                {
+                    f.write_all(path.as_bytes())
+                        .expect("Error writing path to file");
+                    f.write_all("\n".as_bytes())
+                        .expect("Error writing new line to file");
+                }
+            } else {
+                self.add_error("Error", "Error opening droped document", None)
             }
+        }else{
+            self.add_error("Error", "No provider!", None)
         }
     }
 
@@ -310,8 +346,10 @@ impl<'a> Application {
         screen_rect: Rectangle,
         context: &mut RaylibDrawHandle,
     ) -> bool {
-        if self.provider.as_ref().expect("Error getting provider").chunk_count() > 0 {
-            return false;
+        if let Some(provider) = self.provider.as_ref() {
+            if provider.chunk_count() > 0 {
+                return false;
+            }
         }
 
         if self.recent_documents.len() == 0 {
@@ -345,12 +383,19 @@ impl<'a> Application {
                             .as_c_str(),
                     ),
                 ) {
-                    self.provider.as_mut().expect("Error getting provider").open(&self.recent_documents[i]);
+                    if let Some(provider) = self.provider.as_mut() {
+                        provider.open(&self.recent_documents[i]);
+                    }
                 }
             }
         }
 
         return true;
+    }
+
+    fn add_error(&mut self, title: &str, message: &str, callback: Option<fn()>) {
+        self.errors
+            .push((String::from(title), String::from(message), callback));
     }
 }
 
