@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{
     archive::{ArEntryInfo, Archive},
     structs::{Chunk, ChunkStatus},
@@ -100,8 +102,14 @@ pub fn process_page<'a>(archive: Archive, entry: &ArEntryInfo) -> Vec<Chunk> {
         .read(entry.offset, entry.size)
         .expect("Error getting image data");
 
-    //TODO: Get extension from file name
-    match Image::load_image_from_mem(".jpg", &data, data.len().try_into().unwrap()) {
+    let path = Path::new(entry.name);
+    let extension = path.extension().unwrap().to_str().unwrap();
+
+    match Image::load_image_from_mem(
+        format!(".{extension}").as_str(),
+        &data,
+        data.len().try_into().unwrap(),
+    ) {
         Ok(mut image) => {
             let chunks = get_chunks_from_image(&mut image);
             return chunks;
