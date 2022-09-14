@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::{ffi::CString, path::Path};
 
 use crate::unarr::*;
 
@@ -19,15 +19,31 @@ pub struct Archive {
 
 #[allow(unused)]
 impl Archive {
-    pub fn new(_path: &str) -> Self {
-        let path = CString::new(_path).unwrap();
+    pub fn new(_path: &str) -> Result<Self, String> {
+        let c_path = CString::new(_path).unwrap();
+        let path = Path::new(_path);
 
-        let stream = unsafe { ar_open_file(path.as_ptr()) };
+        let stream = unsafe { ar_open_file(c_path.as_ptr()) };
 
-        //TODO: Handle different compression formats
-        let handle = unsafe { ar_open_rar_archive(stream) };
+        let extension = path.extension().unwrap().to_str().unwrap();
 
-        return Archive { handle, stream };
+        match extension {
+            "rar" | "cbr" => {
+                return Ok(Archive {
+                    handle: unsafe { ar_open_rar_archive(stream) },
+                    stream,
+                });
+            }
+            "zip" | "cbz" => {
+                return Ok(Archive {
+                    handle: unsafe { ar_open_zip_archive(stream, false) },
+                    stream,
+                });
+            }
+            _ => {}
+        }
+
+        return Err(format!("Not supported extension: '{extension}'"));
     }
 
     pub fn close(&self) {
