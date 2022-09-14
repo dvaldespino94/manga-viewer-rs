@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::{
     archive::{ArEntryInfo, Archive},
-    structs::{Chunk, ChunkStatus},
+    structs::{Chunk},
 };
 use raylib::math::Rectangle;
 use raylib::prelude::Image;
@@ -67,7 +67,6 @@ pub fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
                 //The chunk's height is calculated
                 let height = y - last_chunk_start;
                 chunks.push(Chunk {
-                    status: ChunkStatus::Idle,
                     rect: Rectangle::new(
                         0.0,
                         last_chunk_start as f32,

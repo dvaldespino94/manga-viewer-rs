@@ -21,6 +21,7 @@ impl DirChunkProvider {
 impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
         if index >= self.chunks.len() {
+            println!("Queried chunk #{index} wich is out of bounds");
             self.last_loaded_image += 1;
             self.get_image(self.last_loaded_image as usize);
         }
@@ -88,8 +89,6 @@ impl IChunkProvider for DirChunkProvider {
         for mut item in image_chunks.iter_mut() {
             item.texture_index = index
         }
-
-        println!("{:?}", &image_chunks);
 
         self.chunks.extend(image_chunks);
         self.image_loading_order.push(index);

@@ -131,7 +131,6 @@ impl<'a> Application {
                 Some(Chunk {
                     rect: c.rect,
                     texture_index: c.texture_index,
-                    status: crate::structs::ChunkStatus::Ready,
                 })
             } else {
                 None

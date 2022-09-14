@@ -1,18 +1,9 @@
 use raylib::prelude::*;
 
 #[derive(Debug)]
-#[allow(dead_code)]
-pub enum ChunkStatus {
-    Idle,
-    Loading,
-    Ready,
-}
-
-#[derive(Debug)]
 pub struct Chunk {
     pub rect: Rectangle,
     pub texture_index: usize,
-    pub status: ChunkStatus,
 }
 
 #[allow(dead_code)]
