@@ -6,10 +6,10 @@ use crate::{structs::Chunk, traits::IChunkProvider};
 
 pub struct DirChunkProvider {
     files: Vec<String>,
+    chunk_index: HashMap<usize, Vec<usize>>,
     chunks: Vec<Chunk>,
     images: HashMap<usize, Image>,
     image_loading_order: Vec<usize>,
-    last_loaded_image: i32,
 }
 
 impl DirChunkProvider {
@@ -22,8 +22,10 @@ impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
         if index >= self.chunks.len() {
             println!("Queried chunk #{index} wich is out of bounds");
-            self.last_loaded_image += 1;
-            self.get_image(self.last_loaded_image as usize);
+            if self.chunk_index.len()==0{
+                self.get_image(0);
+            }
+            self.get_image(*self.chunk_index.keys().max().or(Some(&0)).unwrap()+1 as usize);
         }
 
         self.chunks.get(index)
@@ -42,7 +44,7 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn done_processing(&self) -> bool {
-        self.last_loaded_image >= self.files.len() as i32
+        self.chunks.len() == self.files.len()
     }
 
     fn destroy(&self) {
@@ -84,13 +86,23 @@ impl IChunkProvider for DirChunkProvider {
         let mut image = Image::load_image(self.files[index].as_str()).unwrap();
         self.images.insert(index, image.clone());
 
-        let mut image_chunks = get_chunks_from_image(&mut image);
+        if index == self.chunk_index.len() {
+            let mut image_chunks = get_chunks_from_image(&mut image);
 
-        for mut item in image_chunks.iter_mut() {
-            item.texture_index = index
+            for mut item in image_chunks.iter_mut() {
+                item.texture_index = index
+            }
+
+            let mut index_vec = Vec::new();
+            let start_index = self.chunks.len();
+            for i in 0..image_chunks.len() {
+                index_vec.push(start_index + i);
+                self.chunks.push(image_chunks.remove(0));
+            }
+
+            self.chunk_index.insert(index, index_vec);
         }
 
-        self.chunks.extend(image_chunks);
         self.image_loading_order.push(index);
 
         if self.images.len() > 3 {
@@ -123,8 +135,8 @@ impl Default for DirChunkProvider {
             files: Vec::new(),
             images: HashMap::new(),
             chunks: Vec::new(),
-            last_loaded_image: -1,
             image_loading_order: Vec::new(),
+            chunk_index: HashMap::new(),
         }
     }
 }
