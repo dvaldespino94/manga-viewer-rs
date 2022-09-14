@@ -1,4 +1,11 @@
-use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
+use std::{
+    collections::HashMap,
+    ffi::CString,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::Path,
+    str::FromStr,
+};
 
 use raylib::prelude::*;
 
@@ -380,19 +387,26 @@ impl<'a> Application {
     }
 
     pub fn open_document(&mut self, path: String) -> Result<(), String> {
+        self.recent_documents.push(path);
+
+        self.write_recents();
+        // self.add_error("Error", "Couldn't open document!", None);
+        Ok(())
+    }
+
+    fn write_recents(&mut self) {
+        self.recent_documents.sort();
+        self.recent_documents.dedup();
+
         if let Ok(mut f) = OpenOptions::new()
-            .append(true)
+            .write(true)
             .create(true)
             .open("recent.txt")
         {
-            f.write_all(path.as_bytes())
+            let all = self.recent_documents.join("\n");
+            f.write_all(all.as_bytes())
                 .expect("Error writing path to file");
-            f.write_all("\n".as_bytes())
-                .expect("Error writing new line to file");
         }
-
-        // self.add_error("Error", "Couldn't open document!", None);
-        Ok(())
     }
 }
 

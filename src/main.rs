@@ -21,7 +21,7 @@ fn main() {
     //Initialze RayGUI
     let (mut rl, thread) = init()
         //Set Window Size
-        .size(400, 200)
+        .size(700, 400)
         //Make window resizable
         .resizable()
         //Set Window Title
