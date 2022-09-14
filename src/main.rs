@@ -7,11 +7,11 @@ pub mod application;
 pub mod archive;
 pub mod chunkprovider;
 pub mod dirchunkprovider;
+pub mod metaprovider;
 pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
-pub mod metaprovider;
 
 //Constants and info for the whole application
 const APP_TITLE: &str = "Manga Viewer";
@@ -55,10 +55,8 @@ fn main() {
         app.image_queries.clear();
 
         if rl.is_file_dropped() {
-            if let Ok(_) = app.open_document(rl.get_dropped_files()[0].to_string()){
-
-            }else{
-
+            if let Ok(_) = app.open_document(rl.get_dropped_files()[0].to_string()) {
+            } else {
             }
             rl.clear_dropped_files();
         }

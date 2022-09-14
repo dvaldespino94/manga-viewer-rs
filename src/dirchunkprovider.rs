@@ -22,10 +22,10 @@ impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
         if index >= self.chunks.len() {
             println!("Queried chunk #{index} wich is out of bounds");
-            if self.chunk_index.len()==0{
+            if self.chunk_index.len() == 0 {
                 self.get_image(0);
             }
-            self.get_image(*self.chunk_index.keys().max().or(Some(&0)).unwrap()+1 as usize);
+            self.get_image(*self.chunk_index.keys().max().or(Some(&0)).unwrap() + 1 as usize);
         }
 
         self.chunks.get(index)

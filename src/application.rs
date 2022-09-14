@@ -4,8 +4,6 @@ use raylib::prelude::*;
 
 use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
 
-//TODO: Application Splash
-
 //Main Application class, holds viewer state and provider
 pub struct Application {
     //Current chunk index
@@ -366,7 +364,7 @@ impl<'a> Application {
                             .as_c_str(),
                     ),
                 ) {
-                    if !self.provider.open(&self.recent_documents[i]){
+                    if !self.provider.open(&self.recent_documents[i]) {
                         self.add_error("Error", "Couldn't find a situable provider", None)
                     }
                 }

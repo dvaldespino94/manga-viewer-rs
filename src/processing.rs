@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::{
     archive::{ArEntryInfo, Archive},
-    structs::{Chunk},
+    structs::Chunk,
 };
 use raylib::math::Rectangle;
 use raylib::prelude::Image;
