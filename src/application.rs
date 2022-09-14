@@ -32,7 +32,6 @@ pub struct Application {
     pub errors: Vec<(String, String, Option<fn()>)>,
 }
 
-//TODO: Keep textures hash as light as possible, freeing non used textures
 impl<'a> Application {
     /// Creates a new [`Application`].
     pub fn new() -> Self {
