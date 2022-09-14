@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use raylib::prelude::Image;
 
 use crate::{dirchunkprovider::DirChunkProvider, structs::Chunk, traits::IChunkProvider};
@@ -46,6 +44,22 @@ impl IChunkProvider for MetaProvider {
     }
 
     fn open(&mut self, path: &str) -> bool {
+        let mut index = 0;
+
+        //Get a provider that can handle this file format
+        for provider in self.providers.iter() {
+            if provider.get_metadata(path).is_some() {
+                self.current_provider_index = index;
+                break;
+            }
+            index += 1;
+        }
+
+        //If there was no situable provider just return false
+        if index >= self.providers.len() {
+            return false;
+        }
+
         self.current_provider_mut().open(path)
     }
 

@@ -370,7 +370,9 @@ impl<'a> Application {
                             .as_c_str(),
                     ),
                 ) {
-                    self.provider.open(&self.recent_documents[i]);
+                    if !self.provider.open(&self.recent_documents[i]){
+                        self.add_error("Error", "Couldn't find a situable provider", None)
+                    }
                 }
             }
         }

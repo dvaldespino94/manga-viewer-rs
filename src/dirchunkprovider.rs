@@ -1,4 +1,4 @@
-use crate::processing::get_chunks_from_image;
+use crate::{processing::get_chunks_from_image, structs::ComicMetadata};
 use raylib::prelude::*;
 use std::{cmp::max, collections::HashMap, path::Path};
 
@@ -102,6 +102,14 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn get_metadata(&self, _path: &str) -> Option<crate::structs::ComicMetadata> {
+        let path = Path::new(_path);
+        if path.exists() && path.is_dir() {
+            return Some(ComicMetadata {
+                title: String::from(path.file_name().unwrap().to_str().unwrap()),
+                chunk_count: 0,
+                last_seen_chunk: 0,
+            });
+        }
         None
     }
 }
