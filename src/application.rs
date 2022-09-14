@@ -1,8 +1,12 @@
 use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
-use raylib::prelude::*;
+use raylib::{ffi::IsKeyDown, prelude::*};
 
 use crate::{structs::Chunk, traits::IChunkProvider};
+
+//TODO: Application Splash
+//TODO: Fix chunk indicator showing one more chunk than chunk_count
+//TODO: Fix chunk sequential loading problems
 
 //Main Application class, holds viewer state and provider
 pub struct Application<'a> {
@@ -84,6 +88,7 @@ impl<'a> Application<'a> {
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
         if self.errors.len() > 0 {
             let err = self.errors.get(0).unwrap();
+
             let mut title_rect = screen_rect;
             let mut message_rect = screen_rect;
             let mut button_rect = screen_rect;
@@ -134,7 +139,6 @@ impl<'a> Application<'a> {
         }
 
         //If a chunk has been retrieved from the provider
-
         if let Some(chunk) = &self.current_chunk {
             //Check if there is a texture already loaded from the provider
             let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
@@ -245,6 +249,10 @@ impl<'a> Application<'a> {
         let mut something_changed = false;
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
 
+        if context.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
+            self.provider = None
+        }
+
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
             //Calculate width/height ratio
@@ -321,23 +329,17 @@ impl<'a> Application<'a> {
     }
 
     pub fn handle_dropped_document(&mut self, path: String) {
-        if let Some(provider) = self.provider.as_mut() {
-            if provider.open(path.as_str()) {
-                if let Ok(mut f) = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open("recent.txt")
-                {
-                    f.write_all(path.as_bytes())
-                        .expect("Error writing path to file");
-                    f.write_all("\n".as_bytes())
-                        .expect("Error writing new line to file");
-                }
-            } else {
-                self.add_error("Error", "Error opening droped document", None)
+        if self.open_document(path) {
+            if let Ok(mut f) = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open("recent.txt")
+            {
+                f.write_all(path.as_bytes())
+                    .expect("Error writing path to file");
+                f.write_all("\n".as_bytes())
+                    .expect("Error writing new line to file");
             }
-        }else{
-            self.add_error("Error", "No provider!", None)
         }
     }
 
@@ -361,10 +363,10 @@ impl<'a> Application<'a> {
                 Color::BLACK,
             );
         } else {
-            context.draw_text(
+            draw_text_centered(
+                context,
                 "Recent documents:",
-                screen_rect.x as i32 + 5,
-                screen_rect.y as i32,
+                Rectangle::new(screen_rect.x, screen_rect.y, screen_rect.width, 20f32),
                 14,
                 Color::BLACK,
             );
@@ -396,6 +398,10 @@ impl<'a> Application<'a> {
     fn add_error(&mut self, title: &str, message: &str, callback: Option<fn()>) {
         self.errors
             .push((String::from(title), String::from(message), callback));
+    }
+
+    fn open_document(&self, path: String) -> bool {
+        false
     }
 }
 

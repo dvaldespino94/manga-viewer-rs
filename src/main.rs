@@ -3,11 +3,13 @@ use std::borrow::BorrowMut;
 use application::Application;
 use raylib::prelude::*;
 
-pub mod processing;
+use crate::dirchunkprovider::DirChunkProvider;
+
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
 pub mod dirchunkprovider;
+pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
@@ -28,6 +30,9 @@ fn main() {
         //Finally call build to get the context initialized
         .build();
 
+    //Disable closing on Escape key
+    rl.set_exit_key(None);
+
     //Set target FPS for the application to 30
     rl.set_target_fps(30);
 
@@ -39,6 +44,9 @@ fn main() {
 
     //Instantiate the application
     let mut app: Application = Application::new();
+
+    let mut provider = DirChunkProvider::new();
+    app.provider = Some(Box::new(&mut provider));
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;

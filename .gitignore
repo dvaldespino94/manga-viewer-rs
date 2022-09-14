@@ -3,3 +3,5 @@ manga-viewer-rs*
 .idea
 .DS_Store
 /out
+/fonts
+recent.txt
