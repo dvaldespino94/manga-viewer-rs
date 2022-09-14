@@ -1,21 +1,21 @@
 use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
-use raylib::{ffi::IsKeyDown, prelude::*};
+use raylib::prelude::*;
 
-use crate::{structs::Chunk, traits::IChunkProvider};
+use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
 
 //TODO: Application Splash
 //TODO: Fix chunk indicator showing one more chunk than chunk_count
 //TODO: Fix chunk sequential loading problems
 
 //Main Application class, holds viewer state and provider
-pub struct Application<'a> {
+pub struct Application {
     //Current chunk index
     current_chunk_index: usize,
     //Current chunk cached instance
     current_chunk: Option<Chunk>,
     //Chunk/Texture provider
-    pub provider: Option<Box<&'a mut dyn IChunkProvider>>,
+    pub provider: Box<dyn IChunkProvider>,
     //Images to be converted into textures
     pub image_queries: Vec<usize>,
     //Hash keeping the textures
@@ -33,13 +33,13 @@ pub struct Application<'a> {
 }
 
 //TODO: Keep textures hash as light as possible, freeing non used textures
-impl<'a> Application<'a> {
+impl<'a> Application {
     /// Creates a new [`Application`].
     pub fn new() -> Self {
         //Return a new application
         Self {
             current_chunk_index: 0,
-            provider: None,
+            provider: Box::new(MetaProvider::new()),
             current_chunk: None,
             image_queries: Vec::new(),
             textures: HashMap::new(),
@@ -64,7 +64,8 @@ impl<'a> Application<'a> {
         for query in self.image_queries.iter() {
             println!("Loading texture {:?}", query);
 
-            if let Some(provider) = self.provider.as_mut() {
+            {
+                let provider = &mut self.provider;
                 //Try to get the image from the provider
                 if let Some(image) = provider.get_image(*query) {
                     //Get the texture from the image
@@ -125,7 +126,8 @@ impl<'a> Application<'a> {
         // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
-        if let Some(provider) = self.provider.as_mut() {
+        {
+            let provider = &mut self.provider;
             //Store current chunk in cache
             self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
                 Some(Chunk {
@@ -198,11 +200,7 @@ impl<'a> Application<'a> {
         //Offset between dots
         let offset = 10.0;
         //How many dots to draw
-        let chunk_count = if let Some(provider) = self.provider.as_mut() {
-            provider.chunk_count() as f32
-        } else {
-            0.0
-        };
+        let chunk_count = self.provider.chunk_count() as f32;
 
         //Actual width occupied by the dots
         let w = (offset) * chunk_count;
@@ -249,9 +247,9 @@ impl<'a> Application<'a> {
         let mut something_changed = false;
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
 
-        if context.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
-            self.provider = None
-        }
+        // if context.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
+        //     self.provider = None
+        // }
 
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
@@ -314,7 +312,8 @@ impl<'a> Application<'a> {
 
         //Keep current_chunk into bounds
         if something_changed {
-            if let Some(provider) = self.provider.as_ref() {
+            {
+                let provider = &self.provider;
                 if self.current_chunk_index >= provider.chunk_count() {
                     self.current_chunk_index = provider.chunk_count() - 1;
                 }
@@ -328,27 +327,13 @@ impl<'a> Application<'a> {
         }
     }
 
-    pub fn handle_dropped_document(&mut self, path: String) {
-        if self.open_document(path) {
-            if let Ok(mut f) = OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open("recent.txt")
-            {
-                f.write_all(path.as_bytes())
-                    .expect("Error writing path to file");
-                f.write_all("\n".as_bytes())
-                    .expect("Error writing new line to file");
-            }
-        }
-    }
-
     fn handle_open_document(
         &mut self,
         screen_rect: Rectangle,
         context: &mut RaylibDrawHandle,
     ) -> bool {
-        if let Some(provider) = self.provider.as_ref() {
+        {
+            let provider = &self.provider;
             if provider.chunk_count() > 0 {
                 return false;
             }
@@ -385,9 +370,7 @@ impl<'a> Application<'a> {
                             .as_c_str(),
                     ),
                 ) {
-                    if let Some(provider) = self.provider.as_mut() {
-                        provider.open(&self.recent_documents[i]);
-                    }
+                    self.provider.open(&self.recent_documents[i]);
                 }
             }
         }
@@ -395,13 +378,25 @@ impl<'a> Application<'a> {
         return true;
     }
 
-    fn add_error(&mut self, title: &str, message: &str, callback: Option<fn()>) {
+    pub fn add_error(&mut self, title: &str, message: &str, callback: Option<fn()>) {
         self.errors
             .push((String::from(title), String::from(message), callback));
     }
 
-    fn open_document(&self, path: String) -> bool {
-        false
+    pub fn open_document(&mut self, path: String) -> Result<(), String> {
+        if let Ok(mut f) = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("recent.txt")
+        {
+            f.write_all(path.as_bytes())
+                .expect("Error writing path to file");
+            f.write_all("\n".as_bytes())
+                .expect("Error writing new line to file");
+        }
+
+        // self.add_error("Error", "Couldn't open document!", None);
+        Ok(())
     }
 }
 

@@ -66,8 +66,8 @@ impl IChunkProvider for DirChunkProvider {
     fn get_image(&mut self, index: usize) -> Option<&raylib::texture::Image> {
         println!("Getting image {}", index);
 
-        if index >= self.files.len(){
-            return None
+        if index >= self.files.len() {
+            return None;
         }
 
         if self.images.contains_key(&index) {
@@ -93,7 +93,7 @@ impl IChunkProvider for DirChunkProvider {
         if self.images.len() > 3 {
             let next_to_remove = self.image_loading_order.remove(0);
             println!("Removing key {}", next_to_remove);
-            
+
             self.images.remove(&next_to_remove);
             println!("Now hash's len is {}", self.images.len())
         }

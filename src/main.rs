@@ -3,8 +3,6 @@ use std::borrow::BorrowMut;
 use application::Application;
 use raylib::prelude::*;
 
-use crate::dirchunkprovider::DirChunkProvider;
-
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
@@ -13,6 +11,7 @@ pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
+pub mod metaprovider;
 
 //Constants and info for the whole application
 const APP_TITLE: &str = "Manga Viewer";
@@ -45,9 +44,6 @@ fn main() {
     //Instantiate the application
     let mut app: Application = Application::new();
 
-    let mut provider = DirChunkProvider::new();
-    app.provider = Some(Box::new(&mut provider));
-
     //Padding for the main UI
     const PADDING: f32 = 10.0;
 
@@ -59,7 +55,11 @@ fn main() {
         app.image_queries.clear();
 
         if rl.is_file_dropped() {
-            app.handle_dropped_document(rl.get_dropped_files()[0].to_string());
+            if let Ok(_) = app.open_document(rl.get_dropped_files()[0].to_string()){
+
+            }else{
+
+            }
             rl.clear_dropped_files();
         }
 
