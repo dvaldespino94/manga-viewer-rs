@@ -5,7 +5,6 @@ use raylib::prelude::*;
 use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
 
 //TODO: Application Splash
-//TODO: Fix chunk indicator showing one more chunk than chunk_count
 //TODO: Fix chunk sequential loading problems
 
 //Main Application class, holds viewer state and provider

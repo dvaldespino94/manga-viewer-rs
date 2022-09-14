@@ -29,6 +29,10 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn chunk_count(&self) -> usize {
+        if self.done_processing() {
+            return self.chunks.len();
+        }
+
         if self.files.len() > 0 {
             return max(self.chunks.len() + 1, 1);
         }
