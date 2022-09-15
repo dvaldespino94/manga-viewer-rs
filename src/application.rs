@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
+use nfd::Response::Okay;
 use raylib::prelude::*;
 
 use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
@@ -175,7 +176,7 @@ impl<'a> Application {
             return;
         }
 
-        if self.handle_open_document(screen_rect, context) {
+        if self.lobby(screen_rect, context) {
             return;
         }
 
@@ -322,12 +323,24 @@ impl<'a> Application {
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
 
         #[cfg(target_os = "windows")]
-        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_ALT;
+        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_CONTROL;
+
         #[cfg(target_os = "macos")]
-        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_KB_MENU;
+        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_SUPER;
 
         if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
-            // self.provider = None
+            let result =
+                nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
+            if let Okay(path) = result {
+                println!("Opening {}", path);
+                if let Err(open_result) = self.open_document(path) {
+                    println!("Error opening document: {}", open_result)
+                }
+            }
+        }
+
+        if context.is_key_pressed(KeyboardKey::KEY_W) && context.is_key_down(MOD_KEY) {
+            self.close_document();
         }
 
         //Handle user scroll only if there is a chunk
@@ -406,16 +419,9 @@ impl<'a> Application {
         }
     }
 
-    fn handle_open_document(
-        &mut self,
-        screen_rect: Rectangle,
-        context: &mut RaylibDrawHandle,
-    ) -> bool {
-        {
-            let provider = &self.provider;
-            if provider.chunk_count() > 0 {
-                return false;
-            }
+    fn lobby(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) -> bool {
+        if self.provider.chunk_count() > 0 {
+            return false;
         }
 
         if self.recent_documents.len() == 0 {
@@ -436,6 +442,7 @@ impl<'a> Application {
             );
 
             for i in 0..self.recent_documents.len() {
+                let path = self.recent_documents[i].as_str();
                 if context.gui_button(
                     Rectangle::new(
                         screen_rect.x + 5.0,
@@ -443,15 +450,9 @@ impl<'a> Application {
                         screen_rect.width - 10.0,
                         15.0,
                     ),
-                    Some(
-                        CString::new(self.recent_documents[i].as_str())
-                            .unwrap()
-                            .as_c_str(),
-                    ),
+                    Some(CString::new(path).unwrap().as_c_str()),
                 ) {
-                    if !self.provider.open(&self.recent_documents[i]) {
-                        self.add_error("Error", "Couldn't find a situable provider", None)
-                    }
+                    return self.open_document(path.to_string()).is_ok();
                 }
             }
         }
@@ -465,9 +466,23 @@ impl<'a> Application {
     }
 
     pub fn open_document(&mut self, path: String) -> Result<(), String> {
-        self.recent_documents.push(path);
-
         self.write_recents();
+
+        self.close_document();
+
+        match self.provider.open(path.as_str()) {
+            Err(error) => {
+                self.add_error("Error", error.as_str(), None);
+
+                return Err("Couldn't find a situable provider".to_string());
+            }
+            Ok(metadata) => {
+                println!("Last chunk: {:?}", metadata);
+                self.current_chunk_index = metadata.last_seen_chunk;
+            }
+        }
+
+        self.register_recent(path);
 
         Ok(())
     }
@@ -486,6 +501,24 @@ impl<'a> Application {
                 .expect("Error writing path to file");
         }
     }
+
+    fn close_document(&mut self) {
+        self.textures.clear();
+        self.image_queries.clear();
+        self.current_chunk_index = 0;
+        self.texture_loading_order.clear();
+        self.current_chunk = None;
+        self.scroll = 0.0;
+        self.smoothed_scroll = 0.0;
+        self.provider.unload();
+    }
+
+    fn register_recent(&mut self, path: String) {
+        if !self.recent_documents.contains(&path) {
+            self.recent_documents.push(path);
+            self.write_recents();
+        }
+    }
 }
 
 fn draw_text_centered(
@@ -500,5 +533,12 @@ fn draw_text_centered(
     let x = rect.x + (rect.width - text_extents.x as f32) / 2.0;
     let y = rect.y + (rect.height - text_extents.y as f32) / 2.0;
 
-    context.draw_text_ex(font, text, Vector2::new(x, y), font.baseSize as f32, 0.0, color)
+    context.draw_text_ex(
+        font,
+        text,
+        Vector2::new(x, y),
+        font.baseSize as f32,
+        0.0,
+        color,
+    )
 }

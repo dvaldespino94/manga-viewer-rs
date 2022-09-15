@@ -8,8 +8,9 @@ pub trait IChunkProvider {
     fn done_processing(&self) -> bool;
 
     fn destroy(&self);
-    fn open(&mut self, path: &str) -> bool;
+    fn unload(&mut self);
+    fn open(&mut self, path: &str) -> Result<ComicMetadata, String>;
     fn get_image(&mut self, index: usize) -> Option<&Image>;
 
-    fn get_metadata(&self, path: &str) -> Option<ComicMetadata>;
+    fn get_metadata(&self, path: &str) -> Result<ComicMetadata, String>;
 }

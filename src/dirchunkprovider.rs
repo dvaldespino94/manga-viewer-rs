@@ -5,11 +5,13 @@ use std::{cmp::max, collections::HashMap, path::Path};
 use crate::{structs::Chunk, traits::IChunkProvider};
 
 pub struct DirChunkProvider {
+    document_path: String,
     files: Vec<String>,
     chunk_index: HashMap<usize, Vec<usize>>,
     chunks: Vec<Chunk>,
     images: HashMap<usize, Image>,
     image_loading_order: Vec<usize>,
+    last_queried_chunk: usize,
 }
 
 impl DirChunkProvider {
@@ -20,6 +22,7 @@ impl DirChunkProvider {
 
 impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
+        self.last_queried_chunk = index;
         if index >= self.chunks.len() {
             println!("Queried chunk #{index} wich is out of bounds");
             if self.chunk_index.len() == 0 {
@@ -51,9 +54,11 @@ impl IChunkProvider for DirChunkProvider {
         todo!()
     }
 
-    fn open(self: &mut DirChunkProvider, _path: &str) -> bool {
+    fn open(self: &mut DirChunkProvider, _path: &str) -> Result<ComicMetadata, String> {
         let path = Path::new(_path);
         if path.exists() && path.is_dir() {
+            let metadata = self.get_metadata(_path);
+
             if let Ok(dir) = path.read_dir() {
                 self.files = dir
                     .map(|element| element.unwrap().path().to_str().unwrap().to_string())
@@ -64,10 +69,12 @@ impl IChunkProvider for DirChunkProvider {
             //Preload first image
             self.get_image(0);
 
-            return true;
+            self.document_path = _path.to_string();
+
+            return metadata;
         }
 
-        return false;
+        return Err("Error opening document".to_string());
     }
 
     fn get_image(&mut self, index: usize) -> Option<&raylib::texture::Image> {
@@ -116,16 +123,50 @@ impl IChunkProvider for DirChunkProvider {
         self.images.get(&index)
     }
 
-    fn get_metadata(&self, _path: &str) -> Option<crate::structs::ComicMetadata> {
+    fn get_metadata(&self, _path: &str) -> Result<crate::structs::ComicMetadata, String> {
         let path = Path::new(_path);
         if path.exists() && path.is_dir() {
-            return Some(ComicMetadata {
+            let metadata_path: String = format!("{}.last", _path);
+            let mut chunk_index = 0;
+            if let Ok(text) = std::fs::read_to_string(&metadata_path) {
+                match text.parse() {
+                    Ok(parsed_index) => {
+                        chunk_index = parsed_index;
+                    }
+                    Err(error) => {
+                        println!("Error: {}", error);
+                    }
+                }
+            } else {
+                println!("Error reading metadata from {}", &metadata_path.to_string());
+            }
+
+            return Ok(ComicMetadata {
                 title: String::from(path.file_name().unwrap().to_str().unwrap()),
                 chunk_count: 0,
-                last_seen_chunk: 0,
+                last_seen_chunk: chunk_index,
             });
         }
-        None
+
+        Err("Couldn't get metadata!".to_string())
+    }
+
+    fn unload(&mut self) {
+        if self.document_path.is_empty() || !Path::new(self.document_path.as_str()).exists() {
+            return;
+        }
+
+        let metadata_path: String = format!("{}.last", self.document_path);
+        println!("Saving metadata @{}", metadata_path);
+        if let Err(err) = std::fs::write(metadata_path, format!("{:03}", self.last_queried_chunk)) {
+            println!("Error writing metadata: {}", err.to_string());
+        }
+
+        self.files.clear();
+        self.image_loading_order.clear();
+        self.images.clear();
+        self.chunks.clear();
+        self.chunk_index.clear();
     }
 }
 
@@ -137,6 +178,8 @@ impl Default for DirChunkProvider {
             chunks: Vec::new(),
             image_loading_order: Vec::new(),
             chunk_index: HashMap::new(),
+            document_path: String::new(),
+            last_queried_chunk: 0,
         }
     }
 }
