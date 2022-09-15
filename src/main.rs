@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use std::borrow::BorrowMut;
 
 use application::Application;
@@ -17,6 +19,19 @@ pub mod unarr;
 const APP_TITLE: &str = "Manga Viewer";
 const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
+fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread, size: i32) -> Font {
+    let font: Font = rl
+        .load_font_ex(
+            thread,
+            "./fonts/Roboto-Light.ttf",
+            size,
+            FontLoadEx::Default(255),
+        )
+        .expect("Can't load default font!");
+
+    font
+}
+
 fn main() {
     //Initialze RayGUI
     let (mut rl, thread) = init()
@@ -35,6 +50,15 @@ fn main() {
     //Set target FPS for the application to 30
     rl.set_target_fps(30);
 
+    let gui_font = rl
+        .load_font_ex(
+            &thread,
+            "./fonts/Roboto-Light.ttf",
+            12,
+            FontLoadEx::Default(255),
+        )
+        .unwrap();
+
     //Format the Version string
     let app_version_string = format!(
         "{:}.{:02}.{:02}",
@@ -42,10 +66,13 @@ fn main() {
     );
 
     //Instantiate the application
-    let mut app: Application = Application::new();
+    let mut app: Application = Application::new(&mut rl, &thread);
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;
+
+    let title_font = load_font(&mut rl, &thread, 15);
+    let subtitle_font = load_font(&mut rl, &thread, 20);
 
     //RayLib's mainloop
     while !rl.borrow_mut().window_should_close() {
@@ -64,6 +91,7 @@ fn main() {
         {
             //Get the RL Context
             let mut context = rl.begin_drawing(&thread);
+            context.gui_set_font(&gui_font);
 
             //Cache screen rectangle, adding offsets and correcting width/height
             let screen_rect = Rectangle::new(
@@ -80,8 +108,23 @@ fn main() {
             app.draw(screen_rect, &mut context);
 
             //Draw the header and version
-            context.draw_text(APP_TITLE, 5, 5, 12, Color::BLACK);
-            context.draw_text(&app_version_string, 60, 20, 10, Color::DARKGRAY);
+            context.draw_text_ex(
+                &subtitle_font,
+                APP_TITLE,
+                Vector2::new(5.0, 5.0),
+                (&subtitle_font).baseSize as f32,
+                0.0,
+                Color::BLACK,
+            );
+
+            context.draw_text_ex(
+                &title_font,
+                &app_version_string,
+                Vector2::new(60.0, 20.0),
+                (&title_font).baseSize as f32,
+                0.0,
+                Color::DARKGRAY,
+            );
         }
     }
 }

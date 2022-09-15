@@ -1,15 +1,60 @@
-use std::{
-    collections::HashMap,
-    ffi::CString,
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
-    str::FromStr,
-};
+use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
 
 use raylib::prelude::*;
 
 use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
+
+#[derive(Debug)]
+pub struct ApplicationFonts {
+    fonts: Vec<Box<Font>>,
+}
+
+#[allow(dead_code)]
+impl ApplicationFonts {
+    fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
+        let mut fonts = Vec::new();
+
+        fonts.push(Box::new(
+            rl.load_font_ex(
+                thread,
+                "./fonts/Roboto-Light.ttf",
+                14,
+                FontLoadEx::Default(255),
+            )
+            .unwrap(),
+        ));
+        fonts.push(Box::new(
+            rl.load_font_ex(
+                thread,
+                "./fonts/Roboto-Light.ttf",
+                18,
+                FontLoadEx::Default(255),
+            )
+            .unwrap(),
+        ));
+        fonts.push(Box::new(
+            rl.load_font_ex(
+                thread,
+                "./fonts/Roboto-Bold.ttf",
+                14,
+                FontLoadEx::Default(255),
+            )
+            .unwrap(),
+        ));
+
+        Self { fonts }
+    }
+
+    fn default(&self) -> &Box<Font> {
+        self.fonts.get(0).unwrap()
+    }
+    fn large(&self) -> &Box<Font> {
+        self.fonts.get(1).unwrap()
+    }
+    fn bold(&self) -> &Box<Font> {
+        self.fonts.get(2).unwrap()
+    }
+}
 
 //Main Application class, holds viewer state and provider
 pub struct Application {
@@ -33,11 +78,13 @@ pub struct Application {
     texture_loading_order: Vec<usize>,
     //Error messages
     pub errors: Vec<(String, String, Option<fn()>)>,
+    //Fonts
+    pub fonts: ApplicationFonts,
 }
 
 impl<'a> Application {
     /// Creates a new [`Application`].
-    pub fn new() -> Self {
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         //Return a new application
         Self {
             current_chunk_index: 0,
@@ -58,6 +105,7 @@ impl<'a> Application {
             },
             texture_loading_order: Vec::new(),
             errors: Vec::new(),
+            fonts: ApplicationFonts::new(rl, thread),
         }
     }
 
@@ -104,8 +152,20 @@ impl<'a> Application {
             button_rect.x = screen_rect.x + screen_rect.width / 3.0;
             button_rect.width = screen_rect.width / 3.0;
 
-            draw_text_centered(context, err.0.as_str(), title_rect, 14, Color::RED);
-            draw_text_centered(context, err.1.as_str(), message_rect, 12, Color::RED);
+            draw_text_centered(
+                context,
+                err.0.as_str(),
+                title_rect,
+                &self.fonts.large(),
+                Color::RED,
+            );
+            draw_text_centered(
+                context,
+                err.1.as_str(),
+                message_rect,
+                &self.fonts.default(),
+                Color::RED,
+            );
             if context.gui_button(
                 button_rect,
                 Some(CString::new("Dismiss").unwrap().as_c_str()),
@@ -190,12 +250,18 @@ impl<'a> Application {
                 )
             } else {
                 //Draw a label with a "No Texture" message
-                draw_text_centered(context, "No Texture", screen_rect, 14, Color::BLACK);
+                draw_text_centered(
+                    context,
+                    "No Texture",
+                    screen_rect,
+                    &self.fonts.large(),
+                    Color::BLACK,
+                );
             }
         };
 
         //Y position for the indicator
-        let y = screen_rect.y - 2.0 + screen_rect.height;
+        let y = screen_rect.y - 12.0 + screen_rect.height;
         //Available width
         let available_w = screen_rect.width - 10.0;
         //Offset between dots
@@ -227,16 +293,23 @@ impl<'a> Application {
             //Fraction message
             let fraction = format!("{current:03} / {chunk_count:03}");
             //Calculate message width
-            let message_width = measure_text(fraction.as_str(), 14);
+            let message_extents = measure_text_ex(
+                self.fonts.large() as &Font,
+                fraction.as_str(),
+                self.fonts.large().baseSize as f32,
+                0.0,
+            );
+
             //Starting x offset for fraction
-            let x_offset = screen_rect.x + 5.0 + (available_w - message_width as f32) / 2.0;
+            let x_offset = screen_rect.x + (available_w - message_extents.x) / 2.0;
 
             //Draw the fraction message
-            context.draw_text(
+            context.draw_text_ex(
+                self.fonts.default() as &Font,
                 fraction.as_str(),
-                x_offset as i32,
-                y as i32,
-                14,
+                Vector2::new(x_offset, y),
+                self.fonts.default().baseSize as f32,
+                0.0,
                 Color::BLACK,
             );
         }
@@ -248,9 +321,14 @@ impl<'a> Application {
         let mut something_changed = false;
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
 
-        // if context.is_key_pressed(KeyboardKey::KEY_ESCAPE) {
-        //     self.provider = None
-        // }
+        #[cfg(target_os = "windows")]
+        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_ALT;
+        #[cfg(target_os = "macos")]
+        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_KB_MENU;
+
+        if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
+            // self.provider = None
+        }
 
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
@@ -345,7 +423,7 @@ impl<'a> Application {
                 context,
                 "No Recent documents",
                 screen_rect,
-                14,
+                &self.fonts.large(),
                 Color::BLACK,
             );
         } else {
@@ -353,7 +431,7 @@ impl<'a> Application {
                 context,
                 "Recent documents:",
                 Rectangle::new(screen_rect.x, screen_rect.y, screen_rect.width, 20f32),
-                14,
+                self.fonts.large(),
                 Color::BLACK,
             );
 
@@ -390,7 +468,7 @@ impl<'a> Application {
         self.recent_documents.push(path);
 
         self.write_recents();
-        // self.add_error("Error", "Couldn't open document!", None);
+
         Ok(())
     }
 
@@ -414,11 +492,13 @@ fn draw_text_centered(
     context: &mut RaylibDrawHandle,
     text: &str,
     rect: Rectangle,
-    font_size: i32,
+    font: &Font,
     color: Color,
 ) {
-    let text_width = measure_text(text, font_size);
-    let x = rect.x + (rect.width - text_width as f32) / 2.0;
-    let y = rect.y + (rect.height - font_size as f32) / 2.0;
-    context.draw_text(text, x as i32, y as i32, font_size, color)
+    let text_extents = measure_text_ex(font, text, font.baseSize as f32, 0.0);
+
+    let x = rect.x + (rect.width - text_extents.x as f32) / 2.0;
+    let y = rect.y + (rect.height - text_extents.y as f32) / 2.0;
+
+    context.draw_text_ex(font, text, Vector2::new(x, y), font.baseSize as f32, 0.0, color)
 }
