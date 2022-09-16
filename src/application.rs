@@ -1,5 +1,6 @@
 use std::{cmp::min, collections::HashMap, ffi::CString};
 
+use crate::database::Database;
 use nfd::Response::Okay;
 use raylib::prelude::*;
 use rusqlite::Connection;
@@ -9,19 +10,6 @@ use crate::{
     structs::{Chunk, ComicMetadata},
     traits::IChunkProvider,
 };
-
-struct RecentHandler;
-
-#[allow(dead_code, unused)]
-impl RecentHandler {
-    fn get_recents(db: &Connection) -> Vec<ComicMetadata> {
-        Vec::new()
-    }
-
-    fn save(db: &Connection, recents: &Vec<ComicMetadata>) -> Result<usize, rusqlite::Error> {
-        todo!()
-    }
-}
 
 #[derive(Debug)]
 pub struct ApplicationFonts {
@@ -100,13 +88,14 @@ pub struct Application {
     //Fonts
     pub fonts: ApplicationFonts,
     //Metadata database
-    pub db: Connection,
+    pub db: Database,
 }
 
 impl<'a> Application {
     /// Creates a new [`Application`].
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         let provider = Box::new(MetaProvider::new());
+        let mut db=Database::new();
 
         //Return a new application
         Self {
@@ -117,11 +106,11 @@ impl<'a> Application {
             textures: HashMap::new(),
             scroll: 0.0,
             smoothed_scroll: 0.0,
-            recent_documents: Vec::new(),
+            recent_documents: db.get_recents(),
             texture_loading_order: Vec::new(),
             errors: Vec::new(),
             fonts: ApplicationFonts::new(rl, thread),
-            db: connect_to_database(),
+            db,
         }
     }
 
@@ -638,7 +627,7 @@ impl<'a> Application {
     }
 
     fn write_recents(&mut self) {
-        if let Err(error) = RecentHandler::save(&self.db, &self.recent_documents) {
+        if let Err(error) = self.db.save_recents(&self.recent_documents) {
             eprintln!("Error writing recents: {:?}", error);
         }
     }
@@ -659,34 +648,6 @@ impl<'a> Application {
     }
 }
 
-fn connect_to_database() -> Connection {
-    let conn = Connection::open("metadata.sqlite3").expect("Couldn't open metadata database");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS
-        Metadata(
-            path TEXT PRIMARY KEY,
-            chunk_count INTEGER,
-            last_chunk INTEGER,
-            icon BLOB
-        )",
-        [],
-    )
-    .expect("Error creating metadata table");
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS
-    Recents(
-        id INTEGER PRIMARY KEY,
-        path TEXT UNIQUE,
-        timestamp INTEGER
-    );",
-        [],
-    )
-    .expect("Error creating recents table");
-
-    conn
-}
 
 fn draw_text_centered(
     context: &mut RaylibDrawHandle,

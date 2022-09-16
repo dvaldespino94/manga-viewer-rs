@@ -14,6 +14,7 @@ pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
+pub mod database;
 
 //Constants and info for the whole application
 const APP_TITLE: &str = "Manga Viewer";

@@ -127,19 +127,6 @@ impl IChunkProvider for DirChunkProvider {
             return;
         }
 
-        let metadata_path: String = format!("{}.last", self.document_path);
-        eprintln!("Saving metadata @{}", metadata_path);
-
-        // let metadata = ComicMetadata {
-        //     title: String::new(),
-        //     chunk_count: self.chunk_count(),
-        //     last_seen_chunk: self.last_queried_chunk,
-        //     path: self.document_path.to_string(),
-        //     thumbnail: None,
-        // };
-
-        todo!("Save Metadata");
-
         self.files.clear();
         self.image_loading_order.clear();
         self.images.clear();
