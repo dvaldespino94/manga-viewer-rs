@@ -95,7 +95,7 @@ impl<'a> Application {
     /// Creates a new [`Application`].
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
         let provider = Box::new(MetaProvider::new());
-        let mut db=Database::new();
+        let mut db = Database::new();
 
         //Return a new application
         Self {
@@ -569,10 +569,8 @@ impl<'a> Application {
 
                         if self.draw_recent_card(rect, context, Some(metadata.title.to_string())) {
                             let metadata = self.recent_documents.get(index).unwrap();
-                            let path_copy=&metadata.path.to_string();
-                            return self
-                                .open_document(path_copy)
-                                .is_ok();
+                            let path_copy = &metadata.path.to_string();
+                            return self.open_document(path_copy).is_ok();
                         }
                     } else {
                         self.draw_recent_card(rect, context, None);
@@ -616,10 +614,20 @@ impl<'a> Application {
                 return Err("Couldn't find a situable provider".to_string());
             }
             Ok(_) => {
-                let metadata = ComicMetadata::default();
-                eprintln!("Last chunk: {:?}", metadata);
+                //FIXME: This overwrites any previous metadata for this document
+                let metadata = ComicMetadata {
+                    title: String::new(),
+                    chunk_count: 0,
+                    last_seen_chunk: 0,
+                    path: path.to_string(),
+                    thumbnail: None,
+                };
+
                 self.current_chunk_index = metadata.last_seen_chunk;
-                self.register_recent(metadata);
+                self.recent_documents.push(metadata.clone());
+                self.db
+                    .save_metadata(&Vec::from([&metadata]))
+                    .expect("Error saving metadata");
             }
         }
 
@@ -633,6 +641,17 @@ impl<'a> Application {
     }
 
     fn close_document(&mut self) {
+        let metadata = ComicMetadata {
+            title: String::new(),
+            chunk_count: self.provider.chunk_count(),
+            last_seen_chunk: self.current_chunk_index,
+            path: self.doc,
+            thumbnail: None,
+        };
+        self.db
+            .save_metadata(&Vec::from([&metadata]))
+            .expect("Error saving metadata");
+
         self.textures.clear();
         self.image_queries.clear();
         self.current_chunk_index = 0;
@@ -643,11 +662,10 @@ impl<'a> Application {
         self.provider.unload();
     }
 
-    fn register_recent(&mut self, metadata: ComicMetadata) {
-        self.recent_documents.push(metadata);
+    fn register_recent(&mut self, metadata: &ComicMetadata) {
+        self.recent_documents.push(metadata.clone());
     }
 }
-
 
 fn draw_text_centered(
     context: &mut RaylibDrawHandle,

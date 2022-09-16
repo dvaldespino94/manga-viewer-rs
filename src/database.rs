@@ -57,14 +57,37 @@ impl Database {
             .expect("Error clearing recents table");
 
         for recent in recents.iter() {
-            let tx = self.conn.transaction().unwrap();
+            let tx = self
+                .conn
+                .transaction()
+                .expect("Couldn't start a transation");
             tx.execute(
                 "INSERT OR REPLACE INTO Recents(path) VALUES(?);",
                 [recent.path.to_string()],
             )
             .expect("Error inserting Recent into Database");
-            tx.commit().expect("Error commiting changes to DB");
+            tx.commit().expect("Error writing changes to DB");
         }
+
+        Ok(())
+    }
+
+    pub fn save_metadata(&mut self, metadata: &Vec<&ComicMetadata>) -> Result<(), rusqlite::Error> {
+        let tx = self
+            .conn
+            .transaction()
+            .expect("Couldn't start a transation");
+
+        for md in metadata.iter() {
+            println!("Inserting {md:?} into DB");
+            tx.execute("INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?)", [
+                md.path.to_string(),
+                md.chunk_count.to_string(),
+                md.last_seen_chunk.to_string(),
+                String::new(),
+            ]).expect("Error inserting metadata into transaction");
+        }
+        tx.commit()?;
 
         Ok(())
     }
@@ -79,7 +102,7 @@ impl Database {
                 path TEXT PRIMARY KEY,
                 chunk_count INTEGER,
                 last_chunk INTEGER,
-                icon BLOB
+                icon TEXT
             )",
             [],
         )

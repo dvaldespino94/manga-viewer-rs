@@ -20,7 +20,7 @@ pub enum Message {
 }
 
 //Store metadata for books, folders, etc...
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ComicMetadata {
     //The comic's title
     pub title: String,
@@ -31,7 +31,7 @@ pub struct ComicMetadata {
     //Document Path
     pub path: String,
     //Thumbnail
-    pub thumbnail: Option<Texture2D>,
+    pub thumbnail: Option<String>,
 }
 
 impl Default for ComicMetadata {
