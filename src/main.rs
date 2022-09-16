@@ -3,7 +3,7 @@
 use std::borrow::BorrowMut;
 
 use application::Application;
-use raylib::{prelude::*, ffi::_Exit};
+use raylib::prelude::*;
 
 pub mod application;
 pub mod archive;
@@ -60,10 +60,7 @@ fn main() {
         .unwrap();
 
     //Format the Version string
-    let app_version_string = format!(
-        "{:}.{:2}.{:2}",
-        APP_VERSION.0, APP_VERSION.1, APP_VERSION.2
-    );
+    let app_version_string = format!("{:}.{:2}.{:2}", APP_VERSION.0, APP_VERSION.1, APP_VERSION.2);
 
     //Instantiate the application
     let mut app: Application = Application::new(&mut rl, &thread);
@@ -82,7 +79,7 @@ fn main() {
         app.image_queries.clear();
 
         if rl.is_file_dropped() {
-            if let Ok(_) = app.open_document(rl.get_dropped_files()[0].to_string()) {
+            if let Ok(_) = app.open_document(&rl.get_dropped_files()[0]) {
             } else {
             }
             rl.clear_dropped_files();

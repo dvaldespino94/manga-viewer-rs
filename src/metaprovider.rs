@@ -1,10 +1,6 @@
 use raylib::prelude::Image;
 
-use crate::{
-    dirchunkprovider::DirChunkProvider,
-    structs::{Chunk, ComicMetadata},
-    traits::IChunkProvider,
-};
+use crate::{dirchunkprovider::DirChunkProvider, structs::Chunk, traits::IChunkProvider};
 
 pub struct MetaProvider {
     providers: Vec<Box<dyn IChunkProvider>>,
@@ -47,12 +43,12 @@ impl IChunkProvider for MetaProvider {
         self.current_provider().destroy()
     }
 
-    fn open(&mut self, path: &str) -> Result<ComicMetadata, String> {
+    fn open(&mut self, path: &str) -> Result<(), String> {
         let mut index = 0;
 
         //Get a provider that can handle this file format
         for provider in self.providers.iter() {
-            if provider.get_metadata(path).is_ok() {
+            if provider.can_open(path) {
                 self.current_provider_index = index;
                 break;
             }
@@ -71,11 +67,16 @@ impl IChunkProvider for MetaProvider {
         self.current_provider_mut().get_image(index)
     }
 
-    fn get_metadata(&self, path: &str) -> Result<ComicMetadata, String> {
-        self.current_provider().get_metadata(path)
-    }
-
     fn unload(&mut self) {
         self.current_provider_mut().unload();
+    }
+
+    fn can_open(&self, path: &str) -> bool {
+        for provider in self.providers.iter() {
+            if provider.can_open(path) {
+                return true;
+            }
+        }
+        false
     }
 }

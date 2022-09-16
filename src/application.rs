@@ -1,20 +1,27 @@
-use std::{
-    cmp::min,
-    collections::HashMap,
-    ffi::{CStr, CString},
-    fs::OpenOptions,
-    io::Write,
-    path::Path,
-};
+use std::{cmp::min, collections::HashMap, ffi::CString};
 
 use nfd::Response::Okay;
 use raylib::prelude::*;
+use rusqlite::Connection;
 
 use crate::{
     metaprovider::MetaProvider,
     structs::{Chunk, ComicMetadata},
     traits::IChunkProvider,
 };
+
+struct RecentHandler;
+
+#[allow(dead_code, unused)]
+impl RecentHandler {
+    fn get_recents(db: &Connection) -> Vec<ComicMetadata> {
+        Vec::new()
+    }
+
+    fn save(db: &Connection, recents: &Vec<ComicMetadata>) -> Result<usize, rusqlite::Error> {
+        todo!()
+    }
+}
 
 #[derive(Debug)]
 pub struct ApplicationFonts {
@@ -92,6 +99,8 @@ pub struct Application {
     pub errors: Vec<(String, String, Option<fn()>)>,
     //Fonts
     pub fonts: ApplicationFonts,
+    //Metadata database
+    pub db: Connection,
 }
 
 impl<'a> Application {
@@ -112,6 +121,7 @@ impl<'a> Application {
             texture_loading_order: Vec::new(),
             errors: Vec::new(),
             fonts: ApplicationFonts::new(rl, thread),
+            db: connect_to_database(),
         }
     }
 
@@ -359,7 +369,7 @@ impl<'a> Application {
                 nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
             if let Okay(path) = result {
                 eprintln!("Opening {}", path);
-                if let Err(open_result) = self.open_document(path) {
+                if let Err(open_result) = self.open_document(&path) {
                     eprintln!("Error opening document: {}", open_result)
                 }
             }
@@ -538,7 +548,7 @@ impl<'a> Application {
             const CARD_HEIGHT: usize = 100;
             const CARD_SPACING: usize = 10;
 
-            let mut cols = min(
+            let cols = min(
                 screen_rect.width as usize / (CARD_WIDTH + CARD_SPACING / 2),
                 4,
             );
@@ -566,11 +576,14 @@ impl<'a> Application {
                     let index = col_index + (row_index * cols);
 
                     if index < self.recent_documents.len() {
-                        let caption: String = self.recent_documents.get(index).unwrap().to_string();
+                        let metadata = self.recent_documents.get(index).unwrap();
 
-                        if self.draw_recent_card(rect, context, Some(caption)) {
-                            let path = self.recent_documents.get(index).unwrap();
-                            return self.open_document(path.to_string()).is_ok();
+                        if self.draw_recent_card(rect, context, Some(metadata.title.to_string())) {
+                            let metadata = self.recent_documents.get(index).unwrap();
+                            let path_copy=&metadata.path.to_string();
+                            return self
+                                .open_document(path_copy)
+                                .is_ok();
                         }
                     } else {
                         self.draw_recent_card(rect, context, None);
@@ -602,7 +615,7 @@ impl<'a> Application {
             .push((String::from(title), String::from(message), callback));
     }
 
-    pub fn open_document(&mut self, path: String) -> Result<(), String> {
+    pub fn open_document(&mut self, path: &String) -> Result<(), String> {
         self.write_recents();
 
         self.close_document();
@@ -613,29 +626,20 @@ impl<'a> Application {
 
                 return Err("Couldn't find a situable provider".to_string());
             }
-            Ok(metadata) => {
+            Ok(_) => {
+                let metadata = ComicMetadata::default();
                 eprintln!("Last chunk: {:?}", metadata);
                 self.current_chunk_index = metadata.last_seen_chunk;
+                self.register_recent(metadata);
             }
         }
-
-        self.register_recent(path);
 
         Ok(())
     }
 
     fn write_recents(&mut self) {
-        self.recent_documents.sort();
-        self.recent_documents.dedup();
-
-        if let Ok(mut f) = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open("recent.txt")
-        {
-            let all = self.recent_documents.join("\n");
-            f.write_all(all.as_bytes())
-                .expect("Error writing path to file");
+        if let Err(error) = RecentHandler::save(&self.db, &self.recent_documents) {
+            eprintln!("Error writing recents: {:?}", error);
         }
     }
 
@@ -650,12 +654,38 @@ impl<'a> Application {
         self.provider.unload();
     }
 
-    fn register_recent(&mut self, path: String) {
-        if !self.recent_documents.contains(&path) {
-            self.recent_documents.push(path);
-            self.write_recents();
-        }
+    fn register_recent(&mut self, metadata: ComicMetadata) {
+        self.recent_documents.push(metadata);
     }
+}
+
+fn connect_to_database() -> Connection {
+    let conn = Connection::open("metadata.sqlite3").expect("Couldn't open metadata database");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS
+        Metadata(
+            path TEXT PRIMARY KEY,
+            chunk_count INTEGER,
+            last_chunk INTEGER,
+            icon BLOB
+        )",
+        [],
+    )
+    .expect("Error creating metadata table");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS
+    Recents(
+        id INTEGER PRIMARY KEY,
+        path TEXT UNIQUE,
+        timestamp INTEGER
+    );",
+        [],
+    )
+    .expect("Error creating recents table");
+
+    conn
 }
 
 fn draw_text_centered(

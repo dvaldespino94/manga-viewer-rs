@@ -1,4 +1,4 @@
-use crate::{processing::get_chunks_from_image, structs::ComicMetadata};
+use crate::{processing::get_chunks_from_image};
 use raylib::prelude::*;
 use std::{cmp::max, collections::HashMap, path::Path};
 
@@ -54,11 +54,9 @@ impl IChunkProvider for DirChunkProvider {
         todo!()
     }
 
-    fn open(self: &mut DirChunkProvider, _path: &str) -> Result<ComicMetadata, String> {
+    fn open(self: &mut DirChunkProvider, _path: &str) -> Result<(), String> {
         let path = Path::new(_path);
         if path.exists() && path.is_dir() {
-            let metadata = self.get_metadata(_path);
-
             if let Ok(dir) = path.read_dir() {
                 self.files = dir
                     .map(|element| element.unwrap().path().to_str().unwrap().to_string())
@@ -71,7 +69,7 @@ impl IChunkProvider for DirChunkProvider {
 
             self.document_path = _path.to_string();
 
-            return metadata;
+            return Ok(());
         }
 
         return Err("Error opening document".to_string());
@@ -123,28 +121,6 @@ impl IChunkProvider for DirChunkProvider {
         self.images.get(&index)
     }
 
-    fn get_metadata(&self, _path: &str) -> Result<crate::structs::ComicMetadata, String> {
-        let path = Path::new(_path);
-        if path.exists() && path.is_dir() {
-            let metadata_path: String = format!("{}.last", _path);
-
-            if let Ok(text) = std::fs::read_to_string(&metadata_path) {
-                match toml::from_str::<ComicMetadata>(&text) {
-                    Ok(metadata) => {
-                        return Ok(metadata);
-                    }
-                    Err(error) => {
-                        eprintln!("Error: {}", error);
-                    }
-                }
-            } else {
-                eprintln!("Error reading metadata from {}", &metadata_path.to_string());
-            }
-        }
-
-        Err("Couldn't get metadata!".to_string())
-    }
-
     fn unload(&mut self) {
         if self.document_path.is_empty() || !Path::new(self.document_path.as_str()).exists() {
             println!("Path is empty!");
@@ -154,21 +130,15 @@ impl IChunkProvider for DirChunkProvider {
         let metadata_path: String = format!("{}.last", self.document_path);
         eprintln!("Saving metadata @{}", metadata_path);
 
-        let metadata = ComicMetadata {
-            title: String::new(),
-            chunk_count: self.chunk_count(),
-            last_seen_chunk: self.last_queried_chunk,
-        };
-        match toml::to_string(&metadata) {
-            Ok(raw_metadata) => {
-                if let Err(err) = std::fs::write(metadata_path, raw_metadata) {
-                    eprintln!("Error writing metadata: {}", err.to_string());
-                }
-            }
-            Err(error) => {
-                eprintln!("Error: {:?}", error);
-            }
-        }
+        // let metadata = ComicMetadata {
+        //     title: String::new(),
+        //     chunk_count: self.chunk_count(),
+        //     last_seen_chunk: self.last_queried_chunk,
+        //     path: self.document_path.to_string(),
+        //     thumbnail: None,
+        // };
+
+        todo!("Save Metadata");
 
         self.files.clear();
         self.image_loading_order.clear();
@@ -176,6 +146,11 @@ impl IChunkProvider for DirChunkProvider {
         self.chunks.clear();
         self.chunk_index.clear();
         self.document_path = String::new();
+    }
+
+    fn can_open(&self, document_path: &str) -> bool {
+        let path = Path::new(document_path);
+        return path.exists() && path.is_dir();
     }
 }
 
