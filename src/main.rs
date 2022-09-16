@@ -3,7 +3,7 @@
 use std::borrow::BorrowMut;
 
 use application::Application;
-use raylib::prelude::*;
+use raylib::{prelude::*, ffi::_Exit};
 
 pub mod application;
 pub mod archive;
@@ -127,4 +127,7 @@ fn main() {
             );
         }
     }
+
+    //Unload current provider, so metadata gets saved on app quit
+    app.provider.unload();
 }

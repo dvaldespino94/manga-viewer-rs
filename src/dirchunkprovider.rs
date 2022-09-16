@@ -127,11 +127,11 @@ impl IChunkProvider for DirChunkProvider {
         let path = Path::new(_path);
         if path.exists() && path.is_dir() {
             let metadata_path: String = format!("{}.last", _path);
-            let mut chunk_index = 0;
+
             if let Ok(text) = std::fs::read_to_string(&metadata_path) {
-                match text.parse() {
-                    Ok(parsed_index) => {
-                        chunk_index = parsed_index;
+                match toml::from_str::<ComicMetadata>(&text) {
+                    Ok(metadata) => {
+                        return Ok(metadata);
                     }
                     Err(error) => {
                         eprintln!("Error: {}", error);
@@ -140,12 +140,6 @@ impl IChunkProvider for DirChunkProvider {
             } else {
                 eprintln!("Error reading metadata from {}", &metadata_path.to_string());
             }
-
-            return Ok(ComicMetadata {
-                title: String::from(path.file_name().unwrap().to_str().unwrap()),
-                chunk_count: 0,
-                last_seen_chunk: chunk_index,
-            });
         }
 
         Err("Couldn't get metadata!".to_string())
@@ -160,8 +154,20 @@ impl IChunkProvider for DirChunkProvider {
         let metadata_path: String = format!("{}.last", self.document_path);
         eprintln!("Saving metadata @{}", metadata_path);
 
-        if let Err(err) = std::fs::write(metadata_path, format!("{:03}", self.last_queried_chunk)) {
-            eprintln!("Error writing metadata: {}", err.to_string());
+        let metadata = ComicMetadata {
+            title: String::new(),
+            chunk_count: self.chunk_count(),
+            last_seen_chunk: self.last_queried_chunk,
+        };
+        match toml::to_string(&metadata) {
+            Ok(raw_metadata) => {
+                if let Err(err) = std::fs::write(metadata_path, raw_metadata) {
+                    eprintln!("Error writing metadata: {}", err.to_string());
+                }
+            }
+            Err(error) => {
+                eprintln!("Error: {:?}", error);
+            }
         }
 
         self.files.clear();

@@ -1,4 +1,5 @@
 use raylib::prelude::*;
+use serde_derive::{Serialize, Deserialize};
 
 #[derive(Debug)]
 pub struct Chunk {
@@ -20,7 +21,7 @@ pub enum Message {
 }
 
 //Store metadata for books, folders, etc...
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ComicMetadata {
     //The comic's title
     pub title: String,
