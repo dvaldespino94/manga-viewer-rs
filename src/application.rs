@@ -1,4 +1,10 @@
-use std::{collections::HashMap, ffi::CString, fs::OpenOptions, io::Write, path::Path};
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    fs::OpenOptions,
+    io::Write,
+    path::Path,
+};
 
 use nfd::Response::Okay;
 use raylib::prelude::*;
@@ -183,7 +189,7 @@ impl<'a> Application {
         //Handle user input
         self.handle_input(context, &screen_rect);
 
-        self.smoothed_scroll += (self.scroll - self.smoothed_scroll) * 0.3;
+        self.smoothed_scroll += (self.scroll - self.smoothed_scroll) * 0.5;
 
         //Draw borders(this is intended for debugging only)
         // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
@@ -275,9 +281,25 @@ impl<'a> Application {
         //Does it fit in the available space?
         let it_fits = w < available_w;
 
-        //If it does then draw the dots, else draw a fraction
-        //Also draws fraction if loading a batch of chunks when re-opening document or seeking
-        if it_fits && self.provider.chunk_count() >= self.current_chunk_index {
+        //Draws a progressbar if loading a batch of chunks when re-opening document or seeking
+        if self.current_chunk_index > self.provider.chunk_count() {
+            let percent =
+                100.0 * self.provider.chunk_count() as f32 / self.current_chunk_index as f32;
+            context.gui_progress_bar(
+                Rectangle::new(
+                    screen_rect.x + screen_rect.width / 3.0,
+                    (screen_rect.y + screen_rect.height / 2.0) - 10.0,
+                    screen_rect.width / 3.0,
+                    20.0,
+                ),
+                Some(CString::new("Loading... ").unwrap().as_c_str()),
+                Some(CString::new(format!(" {:.1}%", percent)).unwrap().as_c_str()),
+                self.provider.chunk_count() as f32,
+                0.0,
+                self.current_chunk_index as f32,
+            );
+        } else if it_fits {
+            //If it does then draw the dots, else draw a fraction
             //Starting x offset for the dots
             let x_offset = (screen_rect.x + 5.0 + (available_w - w) / 2.0) as i32;
 
@@ -361,7 +383,7 @@ impl<'a> Application {
                     screen_size.height * 0.2
                 } else {
                     //If no keys were detected then try to get mousewheel's value
-                    context.get_mouse_wheel_move() * 4.0
+                    context.get_mouse_wheel_move() * 2.0
                 };
 
                 //Max possible offset
