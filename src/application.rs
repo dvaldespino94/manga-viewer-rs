@@ -377,10 +377,10 @@ impl<'a> Application {
             if real_size.y > screen_size.height {
                 self.scroll += if context.is_key_down(KeyboardKey::KEY_DOWN) {
                     //Handle DOWN arrow
-                    screen_size.height * -0.2
+                    screen_size.height * -0.1
                 } else if context.is_key_down(KeyboardKey::KEY_UP) {
                     //Handle UP arrow
-                    screen_size.height * 0.2
+                    screen_size.height * 0.1
                 } else {
                     //If no keys were detected then try to get mousewheel's value
                     context.get_mouse_wheel_move() * 2.0
