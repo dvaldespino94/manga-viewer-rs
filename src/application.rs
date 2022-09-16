@@ -1,4 +1,5 @@
 use std::{
+    cmp::min,
     collections::HashMap,
     ffi::{CStr, CString},
     fs::OpenOptions,
@@ -9,7 +10,11 @@ use std::{
 use nfd::Response::Okay;
 use raylib::prelude::*;
 
-use crate::{metaprovider::MetaProvider, structs::Chunk, traits::IChunkProvider};
+use crate::{
+    metaprovider::MetaProvider,
+    structs::{Chunk, ComicMetadata},
+    traits::IChunkProvider,
+};
 
 #[derive(Debug)]
 pub struct ApplicationFonts {
@@ -42,8 +47,8 @@ impl ApplicationFonts {
         fonts.push(Box::new(
             rl.load_font_ex(
                 thread,
-                "./fonts/Roboto-Bold.ttf",
-                14,
+                "./fonts/Roboto-Light.ttf",
+                22,
                 FontLoadEx::Default(255),
             )
             .unwrap(),
@@ -80,7 +85,7 @@ pub struct Application {
     //Smoothed scroll offset
     smoothed_scroll: f32,
     //Recent documents list
-    recent_documents: Vec<String>,
+    recent_documents: Vec<ComicMetadata>,
     //Texture indexes in the order they were loaded
     texture_loading_order: Vec<usize>,
     //Error messages
@@ -92,24 +97,18 @@ pub struct Application {
 impl<'a> Application {
     /// Creates a new [`Application`].
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
+        let provider = Box::new(MetaProvider::new());
+
         //Return a new application
         Self {
             current_chunk_index: 0,
-            provider: Box::new(MetaProvider::new()),
+            provider,
             current_chunk: None,
             image_queries: Vec::new(),
             textures: HashMap::new(),
             scroll: 0.0,
             smoothed_scroll: 0.0,
-            //Load recent files from 'recent.txt'
-            recent_documents: if let Ok(text) = std::fs::read_to_string("recent.txt") {
-                text.split("\n")
-                    .map(|x| String::from(x))
-                    .filter(|x| Path::new(x).exists())
-                    .collect()
-            } else {
-                Vec::new()
-            },
+            recent_documents: Vec::new(),
             texture_loading_order: Vec::new(),
             errors: Vec::new(),
             fonts: ApplicationFonts::new(rl, thread),
@@ -293,7 +292,11 @@ impl<'a> Application {
                     20.0,
                 ),
                 Some(CString::new("Loading... ").unwrap().as_c_str()),
-                Some(CString::new(format!(" {:.1}%", percent)).unwrap().as_c_str()),
+                Some(
+                    CString::new(format!(" {:.1}%", percent))
+                        .unwrap()
+                        .as_c_str(),
+                ),
                 self.provider.chunk_count() as f32,
                 0.0,
                 self.current_chunk_index as f32,
@@ -442,6 +445,67 @@ impl<'a> Application {
         }
     }
 
+    fn draw_recent_card(
+        &self,
+        rect: Rectangle,
+        context: &mut RaylibDrawHandle,
+        caption: Option<String>,
+    ) -> bool {
+        if caption.is_none() {
+            context.draw_rectangle_rounded_lines(
+                Rectangle {
+                    y: rect.y + 5.0,
+                    height: rect.height - 10.0,
+                    ..rect
+                },
+                0.1,
+                5,
+                1,
+                Color::LIGHTGRAY,
+            );
+            return false;
+        }
+
+        let hovered = rect.check_collision_point_rec(context.get_mouse_position());
+        let pressed = context.is_mouse_button_down(MouseButton::MOUSE_LEFT_BUTTON);
+
+        let modified_rect = Rectangle {
+            y: if hovered { rect.y } else { rect.y + 5.0 },
+            height: if hovered {
+                rect.height
+            } else {
+                rect.height - 10.0
+            },
+            ..rect
+        };
+
+        context.draw_rectangle_rounded_lines(
+            modified_rect,
+            0.1,
+            5,
+            1,
+            if hovered {
+                if pressed {
+                    Color::BLUE
+                } else {
+                    Color::DARKGRAY
+                }
+            } else {
+                Color::LIGHTGRAY
+            },
+        );
+
+        draw_text_centered(
+            context,
+            caption.unwrap().as_str(),
+            modified_rect,
+            &self.fonts.default(),
+            Color::BLACK,
+        );
+
+        return context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON) && hovered;
+    }
+
     fn lobby(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) -> bool {
         if self.provider.chunk_count() > 0 {
             return false;
@@ -459,25 +523,75 @@ impl<'a> Application {
             draw_text_centered(
                 context,
                 "Recent documents:",
-                Rectangle::new(screen_rect.x, screen_rect.y, screen_rect.width, 20f32),
-                self.fonts.large(),
+                Rectangle::new(
+                    screen_rect.x,
+                    screen_rect.y + 20f32,
+                    screen_rect.width,
+                    20f32,
+                ),
+                self.fonts.bold(),
                 Color::BLACK,
             );
 
-            for i in 0..self.recent_documents.len() {
-                let path = self.recent_documents[i].as_str();
-                if context.gui_button(
-                    Rectangle::new(
-                        screen_rect.x + 5.0,
-                        20.0 + screen_rect.y + i as f32 * 20.0,
-                        screen_rect.width - 10.0,
-                        15.0,
-                    ),
-                    Some(CString::new(path).unwrap().as_c_str()),
-                ) {
-                    return self.open_document(path.to_string()).is_ok();
+            const MAX_RECENT_DOCUMENTS: usize = 8;
+            const CARD_WIDTH: usize = 70;
+            const CARD_HEIGHT: usize = 100;
+            const CARD_SPACING: usize = 10;
+
+            let mut cols = min(
+                screen_rect.width as usize / (CARD_WIDTH + CARD_SPACING / 2),
+                4,
+            );
+            let rows = min(
+                MAX_RECENT_DOCUMENTS / cols as usize,
+                screen_rect.height as usize / (CARD_HEIGHT + CARD_SPACING),
+            );
+
+            let cards_width = cols * CARD_WIDTH + (cols) * CARD_SPACING;
+            let cards_height = rows * CARD_WIDTH + (rows) * CARD_SPACING;
+            let x_offset = screen_rect.x + (screen_rect.width - cards_width as f32) / 2.0;
+            let y_offset = screen_rect.y + (screen_rect.height - cards_height as f32) / 2.0;
+
+            for row_index in 0..rows {
+                for col_index in 0..cols {
+                    let rect = Rectangle::new(
+                        (x_offset as usize + (col_index * CARD_WIDTH + (col_index) * CARD_SPACING))
+                            as f32,
+                        (y_offset as usize + (row_index * CARD_HEIGHT + (row_index) * CARD_SPACING))
+                            as f32,
+                        CARD_WIDTH as f32,
+                        CARD_HEIGHT as f32,
+                    );
+
+                    let index = col_index + (row_index * cols);
+
+                    if index < self.recent_documents.len() {
+                        let caption: String = self.recent_documents.get(index).unwrap().to_string();
+
+                        if self.draw_recent_card(rect, context, Some(caption)) {
+                            let path = self.recent_documents.get(index).unwrap();
+                            return self.open_document(path.to_string()).is_ok();
+                        }
+                    } else {
+                        self.draw_recent_card(rect, context, None);
+                    }
                 }
             }
+
+            // for i in 0..MAX_RECENT_DOCUMENTS {
+            //     let path = self.recent_documents[i].as_str();
+            //     if context.gui_button(
+            //         Rectangle::new(
+            //             screen_rect.x + 5.0,
+            //             20.0 + screen_rect.y + i as f32 * 20.0,
+            //             screen_rect.width - 10.0,
+            //             15.0,
+            //         ),
+            //         Some(CString::new(path).unwrap().as_c_str()),
+            //     ) {
+            //         return self.open_document(path.to_string()).is_ok();
+            //     }
+            // }
         }
 
         return true;
