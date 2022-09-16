@@ -61,7 +61,7 @@ fn main() {
 
     //Format the Version string
     let app_version_string = format!(
-        "{:}.{:02}.{:02}",
+        "{:}.{:2}.{:2}",
         APP_VERSION.0, APP_VERSION.1, APP_VERSION.2
     );
 
