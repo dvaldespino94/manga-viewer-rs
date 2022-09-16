@@ -114,7 +114,7 @@ pub fn process_page<'a>(archive: Archive, entry: &ArEntryInfo) -> Vec<Chunk> {
             return chunks;
         }
         Err(_) => {
-            println!("Error loading image from {}", entry.name);
+            eprintln!("Error loading image from {}", entry.name);
         }
     };
 

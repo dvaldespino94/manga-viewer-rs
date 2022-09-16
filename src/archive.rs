@@ -112,9 +112,9 @@ impl Iterator for Archive {
 //     for entry in archive {
 //         let _data = entry.read(archive.handle).expect("Error reading data");
 //         if _data.len() == entry.size.try_into().unwrap() {
-//             println!("Size matches: {}", _data.len());
+//             eprintln!("Size matches: {}", _data.len());
 //         } else {
-//             println!("{} != {}", _data.len(), entry.size);
+//             eprintln!("{} != {}", _data.len(), entry.size);
 //         }
 //     }
 // }

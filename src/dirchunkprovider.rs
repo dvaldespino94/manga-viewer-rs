@@ -24,7 +24,7 @@ impl IChunkProvider for DirChunkProvider {
     fn get_chunk(&mut self, index: usize) -> Option<&crate::structs::Chunk> {
         self.last_queried_chunk = index;
         if index >= self.chunks.len() {
-            println!("Queried chunk #{index} wich is out of bounds");
+            eprintln!("Queried chunk #{index} wich is out of bounds");
             if self.chunk_index.len() == 0 {
                 self.get_image(0);
             }
@@ -78,7 +78,7 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn get_image(&mut self, index: usize) -> Option<&raylib::texture::Image> {
-        println!("Getting image {}", index);
+        eprintln!("Getting image {}", index);
 
         if index >= self.files.len() {
             return None;
@@ -88,7 +88,7 @@ impl IChunkProvider for DirChunkProvider {
             return self.images.get(&index);
         }
 
-        println!("Image {} not found, fetching...", index);
+        eprintln!("Image {} not found, fetching...", index);
 
         let mut image = Image::load_image(self.files[index].as_str()).unwrap();
         self.images.insert(index, image.clone());
@@ -114,10 +114,10 @@ impl IChunkProvider for DirChunkProvider {
 
         if self.images.len() > 3 {
             let next_to_remove = self.image_loading_order.remove(0);
-            println!("Removing key {}", next_to_remove);
+            eprintln!("Removing key {}", next_to_remove);
 
             self.images.remove(&next_to_remove);
-            println!("Now hash's len is {}", self.images.len())
+            eprintln!("Now hash's len is {}", self.images.len())
         }
 
         self.images.get(&index)
@@ -134,11 +134,11 @@ impl IChunkProvider for DirChunkProvider {
                         chunk_index = parsed_index;
                     }
                     Err(error) => {
-                        println!("Error: {}", error);
+                        eprintln!("Error: {}", error);
                     }
                 }
             } else {
-                println!("Error reading metadata from {}", &metadata_path.to_string());
+                eprintln!("Error reading metadata from {}", &metadata_path.to_string());
             }
 
             return Ok(ComicMetadata {
@@ -153,13 +153,15 @@ impl IChunkProvider for DirChunkProvider {
 
     fn unload(&mut self) {
         if self.document_path.is_empty() || !Path::new(self.document_path.as_str()).exists() {
+            println!("Path is empty!");
             return;
         }
 
         let metadata_path: String = format!("{}.last", self.document_path);
-        println!("Saving metadata @{}", metadata_path);
+        eprintln!("Saving metadata @{}", metadata_path);
+
         if let Err(err) = std::fs::write(metadata_path, format!("{:03}", self.last_queried_chunk)) {
-            println!("Error writing metadata: {}", err.to_string());
+            eprintln!("Error writing metadata: {}", err.to_string());
         }
 
         self.files.clear();
@@ -167,6 +169,7 @@ impl IChunkProvider for DirChunkProvider {
         self.images.clear();
         self.chunks.clear();
         self.chunk_index.clear();
+        self.document_path = String::new();
     }
 }
 

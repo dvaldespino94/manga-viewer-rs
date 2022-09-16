@@ -113,7 +113,7 @@ impl<'a> Application {
     pub fn load_textures(&mut self, context: &mut RaylibHandle, thread: &RaylibThread) {
         //Check for texture queries
         for query in self.image_queries.iter() {
-            println!("Loading texture {:?}", query);
+            eprintln!("Loading texture {:?}", query);
 
             {
                 let provider = &mut self.provider;
@@ -206,11 +206,11 @@ impl<'a> Application {
         if let Some(chunk) = &self.current_chunk {
             //Check if there is a texture already loaded from the provider
             let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
-                // println!("Getting texture from cache!");
+                // eprintln!("Getting texture from cache!");
                 //Unwrap the texture from the local hash
                 self.textures.get(&chunk.texture_index).unwrap()
             } else {
-                // println!("Requesting image {}", chunk.texture_index);
+                // eprintln!("Requesting image {}", chunk.texture_index);
                 //Add the texture index to texture-query list
                 self.image_queries.push(chunk.texture_index);
                 &None
@@ -276,7 +276,8 @@ impl<'a> Application {
         let it_fits = w < available_w;
 
         //If it does then draw the dots, else draw a fraction
-        if it_fits {
+        //Also draws fraction if loading a batch of chunks when re-opening document or seeking
+        if it_fits && self.provider.chunk_count() >= self.current_chunk_index {
             //Starting x offset for the dots
             let x_offset = (screen_rect.x + 5.0 + (available_w - w) / 2.0) as i32;
 
@@ -332,9 +333,9 @@ impl<'a> Application {
             let result =
                 nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
             if let Okay(path) = result {
-                println!("Opening {}", path);
+                eprintln!("Opening {}", path);
                 if let Err(open_result) = self.open_document(path) {
-                    println!("Error opening document: {}", open_result)
+                    eprintln!("Error opening document: {}", open_result)
                 }
             }
         }
@@ -477,7 +478,7 @@ impl<'a> Application {
                 return Err("Couldn't find a situable provider".to_string());
             }
             Ok(metadata) => {
-                println!("Last chunk: {:?}", metadata);
+                eprintln!("Last chunk: {:?}", metadata);
                 self.current_chunk_index = metadata.last_seen_chunk;
             }
         }
