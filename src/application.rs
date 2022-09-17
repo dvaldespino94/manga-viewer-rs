@@ -494,9 +494,15 @@ impl<'a> Application {
             },
         );
 
+        let text = if let Some(pair) = caption.as_ref().unwrap().rsplit_once("/") {
+            pair.1
+        } else {
+            "Untitled"
+        };
+
         draw_text_centered(
             context,
-            caption.unwrap().as_str(),
+            text,
             modified_rect,
             &self.fonts.default(),
             Color::BLACK,
@@ -607,6 +613,8 @@ impl<'a> Application {
 
         self.close_document();
 
+        let metadata = self.db.metadata_for(path);
+
         match self.provider.open(path.as_str()) {
             Err(error) => {
                 self.add_error("Error", error.as_str(), None);
@@ -616,10 +624,10 @@ impl<'a> Application {
             Ok(_) => {
                 //FIXME: This overwrites any previous metadata for this document
                 let metadata = ComicMetadata {
-                    title: String::new(),
+                    title: String::from(path),
                     chunk_count: 0,
                     last_seen_chunk: 0,
-                    path: path.to_string(),
+                    path: String::from(path),
                     thumbnail: None,
                 };
 
@@ -628,6 +636,8 @@ impl<'a> Application {
                 self.db
                     .save_metadata(&Vec::from([&metadata]))
                     .expect("Error saving metadata");
+
+                self.recent_documents = self.db.get_recents();
             }
         }
 
@@ -641,11 +651,17 @@ impl<'a> Application {
     }
 
     fn close_document(&mut self) {
+        let path = if let Some(last_document) = self.recent_documents.last() {
+            last_document.path.clone()
+        } else {
+            String::new()
+        };
+
         let metadata = ComicMetadata {
             title: String::new(),
             chunk_count: self.provider.chunk_count(),
             last_seen_chunk: self.current_chunk_index,
-            path: self.doc,
+            path,
             thumbnail: None,
         };
         self.db
