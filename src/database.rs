@@ -26,26 +26,7 @@ impl Database {
 
         let mut rows = query.query([]).expect("Error getting rows from DB");
 
-        let transform_row = |row: &Row| -> Result<ComicMetadata, Error> {
-            let path: String = row.get(0)?;
-            let chunk_count: usize = row.get(1)?;
-            let last_seen_chunk: usize = row.get(2)?;
-
-            let path_object = Path::new(path.as_str());
-            let title = String::from(path_object.to_str().unwrap());
-
-            println!("ROW: {path} {chunk_count} {title}");
-
-            Ok(ComicMetadata {
-                title,
-                chunk_count,
-                last_seen_chunk,
-                path,
-                thumbnail: None,
-            })
-        };
-
-        rows.mapped(|row| transform_row(row))
+        rows.mapped(sqlite_row_to_metadata)
             .filter(|x| x.is_ok())
             .map(|x| x.unwrap())
             .collect()
@@ -80,12 +61,16 @@ impl Database {
 
         for md in metadata.iter() {
             println!("Inserting {md:?} into DB");
-            tx.execute("INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?)", [
-                md.path.to_string(),
-                md.chunk_count.to_string(),
-                md.last_seen_chunk.to_string(),
-                String::new(),
-            ]).expect("Error inserting metadata into transaction");
+            tx.execute(
+                "INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?)",
+                [
+                    md.path.to_string(),
+                    md.chunk_count.to_string(),
+                    md.last_seen_chunk.to_string(),
+                    String::new(),
+                ],
+            )
+            .expect("Error inserting metadata into transaction");
         }
         tx.commit()?;
 
@@ -120,4 +105,37 @@ impl Database {
 
         Self { conn }
     }
+
+    pub fn metadata_for(&self, path: &str) -> Option<ComicMetadata> {
+        match self.conn.query_row(
+            "SELECT * FROM Metadata WHERE Path==? LIMIT 1;",
+            [path],
+            sqlite_row_to_metadata,
+        ) {
+            Ok(metadata) => return Some(metadata),
+            Err(error) => {
+                eprintln!("Error getting metadata: {:?}", error);
+                return None;
+            }
+        }
+    }
+}
+
+fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
+    let path: String = row.get(0)?;
+    let chunk_count: usize = row.get(1)?;
+    let last_seen_chunk: usize = row.get(2)?;
+
+    let path_object = Path::new(path.as_str());
+    let title = String::from(path_object.to_str().unwrap());
+
+    println!("ROW: {path} {chunk_count} {title}");
+
+    Ok(ComicMetadata {
+        title,
+        chunk_count,
+        last_seen_chunk,
+        path,
+        thumbnail: None,
+    })
 }
