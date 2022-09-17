@@ -3,7 +3,6 @@ use std::{cmp::min, collections::HashMap, ffi::CString};
 use crate::database::Database;
 use nfd::Response::Okay;
 use raylib::prelude::*;
-use rusqlite::Connection;
 
 use crate::{
     metaprovider::MetaProvider,
@@ -89,6 +88,8 @@ pub struct Application {
     pub fonts: ApplicationFonts,
     //Metadata database
     pub db: Database,
+    //Current Document Path
+    pub current_document_path: Option<String>,
 }
 
 impl<'a> Application {
@@ -111,6 +112,7 @@ impl<'a> Application {
             errors: Vec::new(),
             fonts: ApplicationFonts::new(rl, thread),
             db,
+            current_document_path: None,
         }
     }
 
@@ -448,9 +450,9 @@ impl<'a> Application {
         &self,
         rect: Rectangle,
         context: &mut RaylibDrawHandle,
-        caption: Option<String>,
+        metadata: Option<&ComicMetadata>,
     ) -> bool {
-        if caption.is_none() {
+        if metadata.is_none() {
             context.draw_rectangle_rounded_lines(
                 Rectangle {
                     y: rect.y + 5.0,
@@ -494,15 +496,9 @@ impl<'a> Application {
             },
         );
 
-        let text = if let Some(pair) = caption.as_ref().unwrap().rsplit_once("/") {
-            pair.1
-        } else {
-            "Untitled"
-        };
-
         draw_text_centered(
             context,
-            text,
+            metadata.unwrap().title.as_str(),
             modified_rect,
             &self.fonts.default(),
             Color::BLACK,
@@ -573,7 +569,7 @@ impl<'a> Application {
                     if index < self.recent_documents.len() {
                         let metadata = self.recent_documents.get(index).unwrap();
 
-                        if self.draw_recent_card(rect, context, Some(metadata.title.to_string())) {
+                        if self.draw_recent_card(rect, context, Some(metadata)) {
                             let metadata = self.recent_documents.get(index).unwrap();
                             let path_copy = &metadata.path.to_string();
                             return self.open_document(path_copy).is_ok();
@@ -583,21 +579,6 @@ impl<'a> Application {
                     }
                 }
             }
-
-            // for i in 0..MAX_RECENT_DOCUMENTS {
-            //     let path = self.recent_documents[i].as_str();
-            //     if context.gui_button(
-            //         Rectangle::new(
-            //             screen_rect.x + 5.0,
-            //             20.0 + screen_rect.y + i as f32 * 20.0,
-            //             screen_rect.width - 10.0,
-            //             15.0,
-            //         ),
-            //         Some(CString::new(path).unwrap().as_c_str()),
-            //     ) {
-            //         return self.open_document(path.to_string()).is_ok();
-            //     }
-            // }
         }
 
         return true;
@@ -613,8 +594,6 @@ impl<'a> Application {
 
         self.close_document();
 
-        let metadata = self.db.metadata_for(path);
-
         match self.provider.open(path.as_str()) {
             Err(error) => {
                 self.add_error("Error", error.as_str(), None);
@@ -622,20 +601,35 @@ impl<'a> Application {
                 return Err("Couldn't find a situable provider".to_string());
             }
             Ok(_) => {
-                //FIXME: This overwrites any previous metadata for this document
-                let metadata = ComicMetadata {
-                    title: String::from(path),
-                    chunk_count: 0,
-                    last_seen_chunk: 0,
-                    path: String::from(path),
-                    thumbnail: None,
+                let metadata = if let Some(md) = self.db.metadata_for(path) {
+                    md
+                } else {
+                    eprintln!("Using default metadata for {path}!");
+
+                    let new_metadata = ComicMetadata {
+                        title: String::from(path),
+                        chunk_count: 0,
+                        last_seen_chunk: 0,
+                        path: String::from(path),
+                        thumbnail: None,
+                    };
+
+                    //Save metadata for this document
+                    self.db
+                        .save_metadata(&Vec::from([&new_metadata]))
+                        .expect("Error saving metadata");
+
+                    new_metadata
                 };
 
                 self.current_chunk_index = metadata.last_seen_chunk;
                 self.recent_documents.push(metadata.clone());
-                self.db
-                    .save_metadata(&Vec::from([&metadata]))
-                    .expect("Error saving metadata");
+
+                if let Err(error) = self.db.save_recents(&self.recent_documents) {
+                    eprintln!("Error occured saving recents: {:?}", error);
+                }
+
+                self.current_document_path = Some(metadata.path);
 
                 self.recent_documents = self.db.get_recents();
             }
@@ -651,10 +645,10 @@ impl<'a> Application {
     }
 
     fn close_document(&mut self) {
-        let path = if let Some(last_document) = self.recent_documents.last() {
-            last_document.path.clone()
+        let path = if let Some(last_document) = &self.current_document_path {
+            last_document.clone()
         } else {
-            String::new()
+            return;
         };
 
         let metadata = ComicMetadata {
@@ -676,10 +670,7 @@ impl<'a> Application {
         self.scroll = 0.0;
         self.smoothed_scroll = 0.0;
         self.provider.unload();
-    }
-
-    fn register_recent(&mut self, metadata: &ComicMetadata) {
-        self.recent_documents.push(metadata.clone());
+        self.current_document_path = None;
     }
 }
 

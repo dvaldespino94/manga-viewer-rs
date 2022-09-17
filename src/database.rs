@@ -1,4 +1,4 @@
-use std::{default, path::Path};
+use std::path::Path;
 
 use rusqlite::{Connection, Error, Row};
 
@@ -60,7 +60,7 @@ impl Database {
             .expect("Couldn't start a transation");
 
         for md in metadata.iter() {
-            println!("Inserting {md:?} into DB");
+            eprintln!("Inserting {md:?} into DB");
             tx.execute(
                 "INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?)",
                 [
@@ -112,7 +112,10 @@ impl Database {
             [path],
             sqlite_row_to_metadata,
         ) {
-            Ok(metadata) => return Some(metadata),
+            Ok(metadata) => {
+                eprintln!("Got metadata for {path}: {metadata:?}");
+                return Some(metadata);
+            }
             Err(error) => {
                 eprintln!("Error getting metadata: {:?}", error);
                 return None;
@@ -127,9 +130,9 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
     let last_seen_chunk: usize = row.get(2)?;
 
     let path_object = Path::new(path.as_str());
-    let title = String::from(path_object.to_str().unwrap());
+    let title = String::from(path_object.file_name().unwrap().to_str().unwrap());
 
-    println!("ROW: {path} {chunk_count} {title}");
+    eprintln!("ROW: {path} {title} {chunk_count} {last_seen_chunk}");
 
     Ok(ComicMetadata {
         title,

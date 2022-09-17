@@ -123,7 +123,7 @@ impl IChunkProvider for DirChunkProvider {
 
     fn unload(&mut self) {
         if self.document_path.is_empty() || !Path::new(self.document_path.as_str()).exists() {
-            println!("Path is empty!");
+            eprintln!("Path is empty!");
             return;
         }
 
