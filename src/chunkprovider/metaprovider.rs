@@ -60,9 +60,9 @@ impl IChunkProvider for MetaProvider {
             index += 1;
         }
 
-        //If there was no situable provider just return false
+        //If there is no provider just return false
         if index >= self.providers.len() {
-            return Err("No situable provider found!".to_string());
+            return Err("No provider found for this document!".to_string());
         }
 
         self.current_provider_mut().open(path, cached_chunks)
