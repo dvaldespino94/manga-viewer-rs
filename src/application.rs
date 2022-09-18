@@ -1,11 +1,10 @@
 use std::{cmp::min, collections::HashMap, ffi::CString};
 
-use crate::database::Database;
+use crate::{database::Database, chunkprovider::metaprovider::MetaProvider};
 use nfd::Response::Okay;
 use raylib::prelude::*;
 
 use crate::{
-    metaprovider::MetaProvider,
     structs::{Chunk, ComicMetadata},
     traits::IChunkProvider,
 };

@@ -8,8 +8,6 @@ use raylib::prelude::*;
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
-pub mod dirchunkprovider;
-pub mod metaprovider;
 pub mod processing;
 pub mod structs;
 pub mod traits;

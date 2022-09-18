@@ -1,6 +1,9 @@
 use raylib::prelude::Image;
 
-use crate::{dirchunkprovider::DirChunkProvider, structs::Chunk, traits::IChunkProvider};
+use crate::{traits::IChunkProvider, structs::Chunk};
+
+use super::dirchunkprovider::DirChunkProvider;
+
 
 pub struct MetaProvider {
     providers: Vec<Box<dyn IChunkProvider>>,
