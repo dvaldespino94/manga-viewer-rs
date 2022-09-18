@@ -47,7 +47,11 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn done_processing(&self) -> bool {
-        self.chunks.len() == self.files.len()
+        if let Some(last_chunk) = self.chunks.last() {
+            return last_chunk.texture_index == self.files.len() - 1;
+        }
+
+        false
     }
 
     fn destroy(&self) {

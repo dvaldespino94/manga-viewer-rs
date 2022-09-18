@@ -14,6 +14,12 @@ pub struct ApplicationFonts {
     fonts: Vec<Box<Font>>,
 }
 
+pub enum CardAction {
+    None,
+    OpenDocument,
+    RemoveDocument,
+}
+
 #[allow(dead_code)]
 impl ApplicationFonts {
     fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
@@ -414,8 +420,12 @@ impl<'a> Application {
             self.current_chunk_index += 1;
             something_changed = true;
 
-            //Reset scroll position
-            self.scroll = 0.0;
+            if !(self.provider.done_processing()
+                && (self.current_chunk_index == self.provider.chunk_count()))
+            {
+                //Reset scroll position
+                self.scroll = 0.0;
+            }
         } else if context.is_key_pressed(KeyboardKey::KEY_PAGE_UP)
             || context.is_key_pressed(KeyboardKey::KEY_LEFT)
         {
@@ -450,7 +460,7 @@ impl<'a> Application {
         rect: Rectangle,
         context: &mut RaylibDrawHandle,
         metadata: Option<&ComicMetadata>,
-    ) -> bool {
+    ) -> CardAction {
         if metadata.is_none() {
             context.draw_rectangle_rounded_lines(
                 Rectangle {
@@ -463,24 +473,15 @@ impl<'a> Application {
                 1,
                 Color::LIGHTGRAY,
             );
-            return false;
+
+            return CardAction::None;
         }
 
         let hovered = rect.check_collision_point_rec(context.get_mouse_position());
         let pressed = context.is_mouse_button_down(MouseButton::MOUSE_LEFT_BUTTON);
 
-        let modified_rect = Rectangle {
-            y: if hovered { rect.y } else { rect.y + 5.0 },
-            height: if hovered {
-                rect.height
-            } else {
-                rect.height - 10.0
-            },
-            ..rect
-        };
-
         context.draw_rectangle_rounded_lines(
-            modified_rect,
+            rect,
             0.1,
             5,
             1,
@@ -498,12 +499,39 @@ impl<'a> Application {
         draw_text_centered(
             context,
             metadata.unwrap().title.as_str(),
-            modified_rect,
+            rect,
             &self.fonts.default(),
             Color::BLACK,
         );
 
-        return context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON) && hovered;
+        let delete_button_is_hovered = hovered
+            && Rectangle::new(
+                rect.x + (2.0 * rect.width / 3.0),
+                rect.y,
+                rect.width / 3.0,
+                rect.height / 3.0,
+            )
+            .check_collision_point_rec(context.get_mouse_position());
+
+        if delete_button_is_hovered {
+            context.draw_circle(
+                (rect.x + (4.0 * rect.width / 5.0)) as i32,
+                (rect.y + rect.width / 5.0) as i32,
+                rect.width / 6.0,
+                Color::RED.fade(0.3),
+            );
+        }
+
+        if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON)
+            && delete_button_is_hovered
+        {
+            return CardAction::RemoveDocument;
+        }
+
+        if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON) && hovered {
+            return CardAction::OpenDocument;
+        }
+        CardAction::None
     }
 
     fn lobby(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) -> bool {
@@ -568,10 +596,18 @@ impl<'a> Application {
                     if index < self.recent_documents.len() {
                         let metadata = self.recent_documents.get(index).unwrap();
 
-                        if self.draw_recent_card(rect, context, Some(metadata)) {
-                            let metadata = self.recent_documents.get(index).unwrap();
-                            let path_copy = &metadata.path.to_string();
-                            return self.open_document(path_copy).is_ok();
+                        match self.draw_recent_card(rect, context, Some(metadata)) {
+                            CardAction::None => {}
+                            CardAction::OpenDocument => {
+                                let metadata = self.recent_documents.get(index).unwrap();
+                                let path_copy = &metadata.path.to_string();
+                                return self.open_document(path_copy).is_ok();
+                            }
+                            CardAction::RemoveDocument => {
+                                self.recent_documents.remove(index);
+                                self.db.save_recents(&self.recent_documents);
+                                return true;
+                            }
                         }
                     } else {
                         self.draw_recent_card(rect, context, None);
@@ -679,8 +715,19 @@ impl<'a> Application {
 
     fn all_chunks(&mut self) -> Vec<Chunk> {
         (0..self.provider.chunk_count())
-            .map(|index| self.provider.get_chunk(index).unwrap().clone())
-            .collect::<Vec<Chunk>>()
+            .map(|index| {
+                let c = self.provider.get_chunk(index);
+                if c.is_some() {
+                    *c.unwrap()
+                } else {
+                    Chunk {
+                        rect: Rectangle::new(0.0, 0.0, 0.0, 0.0),
+                        texture_index: 0,
+                    }
+                }
+            })
+            .filter(|x| x.rect.width > 0.0)
+            .collect()
     }
 }
 
