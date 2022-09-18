@@ -464,9 +464,10 @@ impl<'a> Application {
         if metadata.is_none() {
             context.draw_rectangle_rounded_lines(
                 Rectangle {
-                    y: rect.y + 5.0,
-                    height: rect.height - 10.0,
-                    ..rect
+                    x: rect.x + 10.0,
+                    y: rect.y + 10.0,
+                    height: rect.height - 20.0,
+                    width: rect.width - 20.0,
                 },
                 0.1,
                 5,
@@ -499,26 +500,29 @@ impl<'a> Application {
         draw_text_centered(
             context,
             metadata.unwrap().title.as_str(),
-            rect,
+            Rectangle::new(rect.x, rect.y + rect.height - 20.0, rect.width, 20.0),
             &self.fonts.default(),
             Color::BLACK,
         );
+        let line_y = rect.y + rect.height - 20.0;
+        context.draw_line(
+            (rect.x) as i32,
+            (line_y) as i32,
+            (rect.x + rect.width) as i32,
+            (line_y) as i32,
+            Color::GRAY,
+        );
+
+        let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
 
         let delete_button_is_hovered = hovered
-            && Rectangle::new(
-                rect.x + (2.0 * rect.width / 3.0),
-                rect.y,
-                rect.width / 3.0,
-                rect.height / 3.0,
-            )
-            .check_collision_point_rec(context.get_mouse_position());
+            && check_collision_point_circle(context.get_mouse_position(), delete_button_center, rect.width/8.0);
 
         if delete_button_is_hovered {
-            context.draw_circle(
-                (rect.x + (4.0 * rect.width / 5.0)) as i32,
-                (rect.y + rect.width / 5.0) as i32,
-                rect.width / 6.0,
-                Color::RED.fade(0.3),
+            context.draw_circle_v(
+                delete_button_center,
+                rect.width / 8.0,
+                Color::RED.fade(0.5),
             );
         }
 
@@ -605,7 +609,7 @@ impl<'a> Application {
                             }
                             CardAction::RemoveDocument => {
                                 self.recent_documents.remove(index);
-                                self.db.save_recents(&self.recent_documents);
+                                self.db.save_recents(&self.recent_documents).expect("Error saving recents");
                                 return true;
                             }
                         }
