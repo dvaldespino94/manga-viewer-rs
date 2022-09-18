@@ -8,11 +8,11 @@ use raylib::prelude::*;
 pub mod application;
 pub mod archive;
 pub mod chunkprovider;
+pub mod database;
 pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
-pub mod database;
 
 //Constants and info for the whole application
 const APP_TITLE: &str = "Manga Viewer";
@@ -42,6 +42,14 @@ fn main() {
         .title("Manga Viewer")
         //Finally call build to get the context initialized
         .build();
+
+    let logo_data = include_bytes!("../images/icon.png");
+    let mut data = Vec::new();
+    data.extend_from_slice(logo_data);
+
+    let mut logo_image = Image::load_image_from_mem(".png", &data, logo_data.len() as i32).unwrap();
+    logo_image.resize(50, 50);
+    let logo_texture = rl.load_texture_from_image(&thread, &logo_image).unwrap();
 
     //Disable closing on Escape key
     rl.set_exit_key(None);
@@ -103,11 +111,14 @@ fn main() {
             //Draw the application
             app.draw(screen_rect, &mut context);
 
+            //Draw Application Logo
+            context.draw_texture(&logo_texture, 5, 5, Color::WHITE);
+
             //Draw the header and version
             context.draw_text_ex(
                 &subtitle_font,
                 APP_TITLE,
-                Vector2::new(5.0, 5.0),
+                Vector2::new(55.0, 15.0),
                 (&subtitle_font).baseSize as f32,
                 0.0,
                 Color::BLACK,
@@ -116,7 +127,7 @@ fn main() {
             context.draw_text_ex(
                 &title_font,
                 &app_version_string,
-                Vector2::new(60.0, 20.0),
+                Vector2::new(120.0, 30.0),
                 (&title_font).baseSize as f32,
                 0.0,
                 Color::DARKGRAY,
