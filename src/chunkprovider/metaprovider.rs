@@ -1,9 +1,8 @@
 use raylib::prelude::Image;
 
-use crate::{traits::IChunkProvider, structs::Chunk};
+use crate::{structs::Chunk, traits::IChunkProvider};
 
 use super::dirchunkprovider::DirChunkProvider;
-
 
 pub struct MetaProvider {
     providers: Vec<Box<dyn IChunkProvider>>,
@@ -14,7 +13,10 @@ impl MetaProvider {
     pub fn new() -> Self {
         let _self = Self {
             current_provider_index: 0,
-            providers: Vec::from([Box::new(DirChunkProvider::new()) as Box<dyn IChunkProvider>]),
+            providers: Vec::from([
+                Box::new(DirChunkProvider::new()) as Box<dyn IChunkProvider>,
+                // Box::new(UnarrChunkProvider::new()) as Box<dyn IChunkProvider>,
+            ]),
         };
 
         _self
@@ -46,7 +48,7 @@ impl IChunkProvider for MetaProvider {
         self.current_provider().destroy()
     }
 
-    fn open(&mut self, path: &str) -> Result<(), String> {
+    fn open(&mut self, path: &str, cached_chunks: Option<Vec<Chunk>>) -> Result<(), String> {
         let mut index = 0;
 
         //Get a provider that can handle this file format
@@ -63,7 +65,7 @@ impl IChunkProvider for MetaProvider {
             return Err("No situable provider found!".to_string());
         }
 
-        self.current_provider_mut().open(path)
+        self.current_provider_mut().open(path, cached_chunks)
     }
 
     fn get_image(&mut self, index: usize) -> Option<&Image> {

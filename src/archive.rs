@@ -1,11 +1,14 @@
-use std::{ffi::CString, path::Path};
+use std::{
+    ffi::{CStr, CString},
+    path::Path,
+};
 
 use crate::unarr::*;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct ArEntryInfo<'a> {
-    pub name: &'a str,
+pub struct ArEntryInfo {
+    pub name: String,
     pub offset: i64,
     pub size: usize,
     pub filetime: i64,
@@ -76,7 +79,7 @@ impl Archive {
 }
 
 impl Iterator for Archive {
-    type Item = ArEntryInfo<'static>;
+    type Item = ArEntryInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
         if unsafe { ar_parse_entry(self.handle) } {
@@ -90,7 +93,10 @@ impl Iterator for Archive {
             }
 
             return Some(ArEntryInfo {
-                name: unsafe { std::ffi::CStr::from_ptr(name) }.to_str().unwrap(),
+                name: unsafe { CStr::from_ptr(name) }
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
                 filetime,
                 offset: unsafe { ar_entry_get_offset(self.handle) },
                 size: unsafe { ar_entry_get_size(self.handle).try_into().unwrap() },

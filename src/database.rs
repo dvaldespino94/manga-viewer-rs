@@ -1,8 +1,9 @@
 use std::path::Path;
 
+use raylib::prelude::Rectangle;
 use rusqlite::{Connection, Error, Row};
 
-use crate::structs::ComicMetadata;
+use crate::structs::{Chunk, ComicMetadata};
 
 pub struct Database {
     pub conn: Connection,
@@ -103,6 +104,22 @@ impl Database {
         )
         .expect("Error creating recents table");
 
+        conn.execute(
+            "
+            CREATE TABLE IF NOT EXISTS
+            Chunks(
+                path TEXT,
+                x INTEGER,
+                y INTEGER,
+                w INTEGER,
+                h INTEGER,
+                texture_index INTEGER,
+                CONSTRAINT \"uniq\" UNIQUE (\"path\", \"texture_index\", \"y\") ON CONFLICT IGNORE
+            );",
+            [],
+        )
+        .expect("Error creating recents table");
+
         Self { conn }
     }
 
@@ -122,6 +139,62 @@ impl Database {
             }
         }
     }
+
+    pub fn chunks_for(&self, path: &str) -> Vec<Chunk> {
+        if let Ok(mut stmt) = self
+            .conn
+            .prepare("SELECT x,y,w,h,texture_index FROM Chunks WHERE Path==?;")
+        {
+            if let Ok(results) = stmt.query([path]) {
+                return results
+                    .mapped(sqlite_row_to_chunk)
+                    .filter(|x| x.is_ok())
+                    .map(|x| x.unwrap())
+                    .collect::<Vec<Chunk>>();
+            }
+        }
+
+        Vec::new()
+    }
+
+    pub fn save_chunk_cache(&mut self, path: String, all_chunks: Vec<Chunk>) {
+        let mut tx = self
+            .conn
+            .transaction()
+            .expect("Couldn't start transaction to save chunks!");
+
+        if let Ok(mut stmt) = tx.prepare("INSERT INTO Chunks VALUES(?,?,?,?,?,?);") {
+            for c in all_chunks {
+                stmt.execute([
+                    &path,
+                    &c.rect.x.to_string(),
+                    &c.rect.y.to_string(),
+                    &c.rect.width.to_string(),
+                    &c.rect.height.to_string(),
+                    &c.texture_index.to_string(),
+                ])
+                .expect("Error inserting Chunk row into db");
+            }
+        }else{
+            println!("Couldn't prepare statement to insert chunks into DB");
+        }
+
+        tx.commit();
+    }
+}
+
+fn sqlite_row_to_chunk(row: &Row) -> Result<Chunk, Error> {
+    let texture_index: usize = row.get(4).unwrap();
+
+    Ok(Chunk {
+        rect: Rectangle::new(
+            row.get(0).unwrap(),
+            row.get(1).unwrap(),
+            row.get(2).unwrap(),
+            row.get(3).unwrap(),
+        ),
+        texture_index,
+    })
 }
 
 fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {

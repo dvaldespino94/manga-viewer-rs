@@ -1,6 +1,6 @@
 use std::{cmp::min, collections::HashMap, ffi::CString};
 
-use crate::{database::Database, chunkprovider::metaprovider::MetaProvider};
+use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
 use nfd::Response::Okay;
 use raylib::prelude::*;
 
@@ -593,7 +593,9 @@ impl<'a> Application {
 
         self.close_document();
 
-        match self.provider.open(path.as_str()) {
+        let cached_chunks = self.db.chunks_for(path);
+
+        match self.provider.open(path.as_str(), Some(cached_chunks)) {
             Err(error) => {
                 self.add_error("Error", error.as_str(), None);
 
@@ -661,6 +663,9 @@ impl<'a> Application {
             .save_metadata(&Vec::from([&metadata]))
             .expect("Error saving metadata");
 
+        let all_chunks = self.all_chunks();
+        self.db.save_chunk_cache(metadata.path, all_chunks);
+
         self.textures.clear();
         self.image_queries.clear();
         self.current_chunk_index = 0;
@@ -670,6 +675,12 @@ impl<'a> Application {
         self.smoothed_scroll = 0.0;
         self.provider.unload();
         self.current_document_path = None;
+    }
+
+    fn all_chunks(&mut self) -> Vec<Chunk> {
+        (0..self.provider.chunk_count())
+            .map(|index| self.provider.get_chunk(index).unwrap().clone())
+            .collect::<Vec<Chunk>>()
     }
 }
 

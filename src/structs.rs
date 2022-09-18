@@ -1,6 +1,6 @@
 use raylib::prelude::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Chunk {
     pub rect: Rectangle,
     pub texture_index: usize,

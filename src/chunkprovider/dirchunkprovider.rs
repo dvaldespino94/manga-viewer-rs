@@ -1,4 +1,4 @@
-use crate::{processing::get_chunks_from_image};
+use crate::processing::get_chunks_from_image;
 use raylib::prelude::*;
 use std::{cmp::max, collections::HashMap, path::Path};
 
@@ -54,7 +54,11 @@ impl IChunkProvider for DirChunkProvider {
         todo!()
     }
 
-    fn open(self: &mut DirChunkProvider, _path: &str) -> Result<(), String> {
+    fn open(
+        self: &mut DirChunkProvider,
+        _path: &str,
+        cached_chunks: Option<Vec<Chunk>>,
+    ) -> Result<(), String> {
         let path = Path::new(_path);
         if path.exists() && path.is_dir() {
             if let Ok(dir) = path.read_dir() {
@@ -62,6 +66,23 @@ impl IChunkProvider for DirChunkProvider {
                     .map(|element| element.unwrap().path().to_str().unwrap().to_string())
                     .filter(|element| element.ends_with(".jpg") || element.ends_with(".png"))
                     .collect();
+            }
+
+            if let Some(chunks) = &cached_chunks {
+                self.chunks = chunks.clone();
+                let mut index: HashMap<usize, Vec<usize>> = HashMap::new();
+
+                for i in 0..self.chunks.len() {
+                    let c = self.chunks.get(i).unwrap();
+                    let t_index = c.texture_index;
+                    if !index.contains_key(&t_index) {
+                        index.insert(t_index, Vec::new());
+                    }
+
+                    index.get_mut(&t_index).unwrap().push(i);
+                }
+
+                self.chunk_index = index;
             }
 
             //Preload first image

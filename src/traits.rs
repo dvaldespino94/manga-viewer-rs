@@ -9,7 +9,7 @@ pub trait IChunkProvider {
 
     fn destroy(&self);
     fn unload(&mut self);
-    fn open(&mut self, path: &str) -> Result<(), String>;
+    fn open(&mut self, path: &str, cached_chunks: Option<Vec<Chunk>>) -> Result<(), String>;
     fn get_image(&mut self, index: usize) -> Option<&Image>;
 
     fn can_open(&self, path: &str) -> bool;

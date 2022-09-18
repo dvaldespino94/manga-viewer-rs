@@ -101,7 +101,7 @@ pub fn process_page<'a>(archive: Archive, entry: &ArEntryInfo) -> Vec<Chunk> {
         .read(entry.offset, entry.size)
         .expect("Error getting image data");
 
-    let path = Path::new(entry.name);
+    let path = Path::new(&entry.name);
     let extension = path.extension().unwrap().to_str().unwrap();
 
     match Image::load_image_from_mem(
