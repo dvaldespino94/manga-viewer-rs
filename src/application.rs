@@ -4,6 +4,8 @@ use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
 use nfd::Response::Okay;
 use raylib::prelude::*;
 
+const DOTS_SHOW_TIMEOUT: f32 = 1.5;
+
 use crate::{
     structs::{Chunk, ComicMetadata},
     traits::IChunkProvider,
@@ -98,6 +100,7 @@ pub struct Application {
     pub logo_texture: Texture2D,
     pub recent_thumbs: Vec<Texture2D>,
     pub recent_thumbs_data: Vec<Vec<u8>>,
+    show_dots_timeout: f32,
 }
 
 impl Application {
@@ -124,6 +127,7 @@ impl Application {
             logo_texture,
             recent_thumbs: Vec::new(),
             recent_thumbs_data: Vec::new(),
+            show_dots_timeout: 5.0,
         }
     }
 
@@ -154,6 +158,9 @@ impl Application {
     //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
         context.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_ARROW);
+        if self.show_dots_timeout > 0.0 {
+            self.show_dots_timeout -= 1.0 / (context.get_fps() as f32);
+        }
 
         if self.errors.len() > 0 {
             let err = self.errors.get(0).unwrap();
@@ -277,7 +284,12 @@ impl Application {
         };
 
         //Y position for the indicator
-        let y = screen_rect.y - 12.0 + screen_rect.height;
+        let mut y = screen_rect.y - 12.0 + screen_rect.height;
+
+        if self.show_dots_timeout < 0.2 {
+            y = screen_rect.y + screen_rect.height + 70.0 * (0.2 - self.show_dots_timeout);
+        }
+
         //Available width
         let available_w = screen_rect.width - 10.0;
         //Offset between dots
@@ -311,7 +323,8 @@ impl Application {
                 0.0,
                 self.current_chunk_index as f32,
             );
-        } else if it_fits {
+        }
+        if it_fits {
             //If it does then draw the dots, else draw a fraction
             //Starting x offset for the dots
             let x_offset = (screen_rect.x + 5.0 + (available_w - w) / 2.0) as i32;
@@ -444,11 +457,10 @@ impl Application {
 
         //Keep current_chunk into bounds
         if something_changed {
-            {
-                let provider = &self.provider;
-                if self.current_chunk_index >= provider.chunk_count() {
-                    self.current_chunk_index = provider.chunk_count() - 1;
-                }
+            self.show_dots_timeout = DOTS_SHOW_TIMEOUT;
+            let provider = &self.provider;
+            if self.current_chunk_index >= provider.chunk_count() {
+                self.current_chunk_index = provider.chunk_count() - 1;
             }
         }
 
