@@ -100,7 +100,7 @@ pub struct Application {
     pub recent_thumbs_data: Vec<Vec<u8>>,
 }
 
-impl<'a> Application {
+impl Application {
     /// Creates a new [`Application`].
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread, logo_texture: Texture2D) -> Self {
         let provider = Box::new(MetaProvider::new());
@@ -154,6 +154,7 @@ impl<'a> Application {
     //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
         context.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_ARROW);
+
         if self.errors.len() > 0 {
             let err = self.errors.get(0).unwrap();
 
