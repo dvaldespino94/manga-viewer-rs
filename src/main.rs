@@ -70,7 +70,7 @@ fn main() {
     let app_version_string = format!("{:}.{:2}.{:2}", APP_VERSION.0, APP_VERSION.1, APP_VERSION.2);
 
     //Instantiate the application
-    let mut app: Application = Application::new(&mut rl, &thread);
+    let mut app: Application = Application::new(&mut rl, &thread, logo_texture);
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;
@@ -92,47 +92,45 @@ fn main() {
             rl.clear_dropped_files();
         }
 
-        {
-            //Get the RL Context
-            let mut context = rl.begin_drawing(&thread);
-            context.gui_set_font(&gui_font);
+        //Get the RL Context
+        let mut context = rl.begin_drawing(&thread);
+        context.gui_set_font(&gui_font);
 
-            //Cache screen rectangle, adding offsets and correcting width/height
-            let screen_rect = Rectangle::new(
-                PADDING,
-                PADDING + 30f32,
-                context.get_screen_width() as f32 - 2f32 * PADDING,
-                context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
-            );
+        //Cache screen rectangle, adding offsets and correcting width/height
+        let screen_rect = Rectangle::new(
+            PADDING,
+            PADDING + 30f32,
+            context.get_screen_width() as f32 - 2f32 * PADDING,
+            context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
+        );
 
-            //Clear the screen's background
-            context.clear_background(Color::WHITE);
+        //Clear the screen's background
+        context.clear_background(Color::WHITE);
 
-            //Draw the application
-            app.draw(screen_rect, &mut context);
+        //Draw the application
+        app.draw(screen_rect, &mut context);
 
-            //Draw Application Logo
-            context.draw_texture(&logo_texture, 5, 5, Color::WHITE);
+        //Draw Application Logo
+        context.draw_texture(&app.logo_texture, 5, 5, Color::WHITE);
 
-            //Draw the header and version
-            context.draw_text_ex(
-                &subtitle_font,
-                APP_TITLE,
-                Vector2::new(55.0, 15.0),
-                (&subtitle_font).baseSize as f32,
-                0.0,
-                Color::BLACK,
-            );
+        //Draw the header and version
+        context.draw_text_ex(
+            &subtitle_font,
+            APP_TITLE,
+            Vector2::new(55.0, 15.0),
+            (&subtitle_font).baseSize as f32,
+            0.0,
+            Color::BLACK,
+        );
 
-            context.draw_text_ex(
-                &title_font,
-                &app_version_string,
-                Vector2::new(120.0, 30.0),
-                (&title_font).baseSize as f32,
-                0.0,
-                Color::DARKGRAY,
-            );
-        }
+        context.draw_text_ex(
+            &title_font,
+            &app_version_string,
+            Vector2::new(120.0, 30.0),
+            (&title_font).baseSize as f32,
+            0.0,
+            Color::DARKGRAY,
+        );
     }
 
     //Unload current provider, so metadata gets saved on app quit

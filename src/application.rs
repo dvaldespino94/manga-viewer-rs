@@ -95,11 +95,14 @@ pub struct Application {
     pub db: Database,
     //Current Document Path
     pub current_document_path: Option<String>,
+    pub logo_texture: Texture2D,
+    pub recent_thumbs: Vec<Texture2D>,
+    pub recent_thumbs_data: Vec<Vec<u8>>,
 }
 
 impl<'a> Application {
     /// Creates a new [`Application`].
-    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread, logo_texture: Texture2D) -> Self {
         let provider = Box::new(MetaProvider::new());
         let mut db = Database::new();
 
@@ -118,6 +121,9 @@ impl<'a> Application {
             fonts: ApplicationFonts::new(rl, thread),
             db,
             current_document_path: None,
+            logo_texture,
+            recent_thumbs: Vec::new(),
+            recent_thumbs_data: Vec::new(),
         }
     }
 
@@ -126,22 +132,20 @@ impl<'a> Application {
         for query in self.image_queries.iter() {
             eprintln!("Loading texture {:?}", query);
 
-            {
-                let provider = &mut self.provider;
-                //Try to get the image from the provider
-                if let Some(image) = provider.get_image(*query) {
-                    //Get the texture from the image
-                    let value = Some(context.load_texture_from_image(thread, image).unwrap());
-                    //Insert the texture into the app's index/texture hash
-                    self.textures.insert(*query, value);
+            let provider = &mut self.provider;
+            //Try to get the image from the provider
+            if let Some(image) = provider.get_image(*query) {
+                //Get the texture from the image
+                let value = Some(context.load_texture_from_image(thread, image).unwrap());
+                //Insert the texture into the app's index/texture hash
+                self.textures.insert(*query, value);
 
-                    if self.textures.len() >= 4 {
-                        self.textures
-                            .remove(&self.texture_loading_order.pop().unwrap());
-                    }
-
-                    self.texture_loading_order.insert(0, *query);
+                if self.textures.len() >= 4 {
+                    self.textures
+                        .remove(&self.texture_loading_order.pop().unwrap());
                 }
+
+                self.texture_loading_order.insert(0, *query);
             }
         }
     }
@@ -149,6 +153,7 @@ impl<'a> Application {
     #[inline]
     //Draw Application
     pub fn draw(&mut self, screen_rect: Rectangle, context: &mut RaylibDrawHandle) {
+        context.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_ARROW);
         if self.errors.len() > 0 {
             let err = self.errors.get(0).unwrap();
 
@@ -200,18 +205,16 @@ impl<'a> Application {
         // context.draw_rectangle_lines_ex(screen_rect, 1, Color::DARKGRAY);
 
         //Unwrap a reference to the provider
-        {
-            let provider = &mut self.provider;
-            //Store current chunk in cache
-            self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
-                Some(Chunk {
-                    rect: c.rect,
-                    texture_index: c.texture_index,
-                })
-            } else {
-                None
-            };
-        }
+        let provider = &mut self.provider;
+        //Store current chunk in cache
+        self.current_chunk = if let Some(c) = provider.get_chunk(self.current_chunk_index) {
+            Some(Chunk {
+                rect: c.rect,
+                texture_index: c.texture_index,
+            })
+        } else {
+            None
+        };
 
         //If a chunk has been retrieved from the provider
         if let Some(chunk) = &self.current_chunk {
@@ -460,6 +463,7 @@ impl<'a> Application {
         rect: Rectangle,
         context: &mut RaylibDrawHandle,
         metadata: Option<&ComicMetadata>,
+        thumbnail: Option<&Texture2D>,
     ) -> CardAction {
         if metadata.is_none() {
             context.draw_rectangle_rounded_lines(
@@ -480,6 +484,10 @@ impl<'a> Application {
 
         let hovered = rect.check_collision_point_rec(context.get_mouse_position());
         let pressed = context.is_mouse_button_down(MouseButton::MOUSE_LEFT_BUTTON);
+
+        if hovered {
+            context.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
+        }
 
         context.draw_rectangle_rounded_lines(
             rect,
@@ -513,17 +521,45 @@ impl<'a> Application {
             Color::GRAY,
         );
 
+        let source_rect = if hovered {
+            Rectangle::new(
+                0.0,
+                0.0,
+                self.logo_texture.width as f32,
+                self.logo_texture.height as f32,
+            )
+        } else {
+            Rectangle::new(
+                -5.0,
+                -5.0,
+                (self.logo_texture.width + 10) as f32,
+                (self.logo_texture.height + 10) as f32,
+            )
+        };
+
+        context.draw_texture_pro(
+            thumbnail.unwrap(),
+            source_rect,
+            Rectangle {
+                height: rect.height - 20.0,
+                ..rect
+            },
+            Vector2::zero(),
+            0.0,
+            Color::WHITE,
+        );
+
         let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
 
         let delete_button_is_hovered = hovered
-            && check_collision_point_circle(context.get_mouse_position(), delete_button_center, rect.width/8.0);
-
-        if delete_button_is_hovered {
-            context.draw_circle_v(
+            && check_collision_point_circle(
+                context.get_mouse_position(),
                 delete_button_center,
                 rect.width / 8.0,
-                Color::RED.fade(0.5),
             );
+
+        if delete_button_is_hovered {
+            context.draw_circle_v(delete_button_center, rect.width / 8.0, Color::RED.fade(0.5));
         }
 
         if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON)
@@ -600,7 +636,13 @@ impl<'a> Application {
                     if index < self.recent_documents.len() {
                         let metadata = self.recent_documents.get(index).unwrap();
 
-                        match self.draw_recent_card(rect, context, Some(metadata)) {
+                        let thumbnail = Some(if metadata.thumbnail.is_none() {
+                            &self.logo_texture
+                        } else {
+                            &self.recent_thumbs[index]
+                        });
+
+                        match self.draw_recent_card(rect, context, Some(metadata), thumbnail) {
                             CardAction::None => {}
                             CardAction::OpenDocument => {
                                 let metadata = self.recent_documents.get(index).unwrap();
@@ -609,12 +651,14 @@ impl<'a> Application {
                             }
                             CardAction::RemoveDocument => {
                                 self.recent_documents.remove(index);
-                                self.db.save_recents(&self.recent_documents).expect("Error saving recents");
+                                self.db
+                                    .save_recents(&self.recent_documents)
+                                    .expect("Error saving recents");
                                 return true;
                             }
                         }
                     } else {
-                        self.draw_recent_card(rect, context, None);
+                        self.draw_recent_card(rect, context, None, None);
                     }
                 }
             }

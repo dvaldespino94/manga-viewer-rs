@@ -31,7 +31,7 @@ pub struct ComicMetadata {
     //Document Path
     pub path: String,
     //Thumbnail
-    pub thumbnail: Option<String>,
+    pub thumbnail: Option<Vec<u8>>,
 }
 
 impl Default for ComicMetadata {
