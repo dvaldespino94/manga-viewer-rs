@@ -9,7 +9,9 @@ raylib = "3.7.0"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 libc = "0.2.132"
 rfd = "*"
-# winres="*"
+
+[target.'cfg(windows)'.build-dependencies]
+windres="0.2"
 
 [package.metadata.bundle]
 icon=["images/icon.png"]
