@@ -1,7 +1,6 @@
 use std::{cmp::min, collections::HashMap, ffi::CString};
 
 use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
-use nfd::Response::Okay;
 use raylib::prelude::*;
 
 const DOTS_SHOW_TIMEOUT: f32 = 1.5;
@@ -377,16 +376,16 @@ impl Application {
         #[cfg(target_os = "macos")]
         const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_SUPER;
 
-        if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
-            let result =
-                nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
-            if let Okay(path) = result {
-                eprintln!("Opening {}", path);
-                if let Err(open_result) = self.open_document(&path) {
-                    eprintln!("Error opening document: {}", open_result)
-                }
-            }
-        }
+        // if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
+        //     let result =
+        //         nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
+        //     if let Okay(path) = result {
+        //         eprintln!("Opening {}", path);
+        //         if let Err(open_result) = self.open_document(&path) {
+        //             eprintln!("Error opening document: {}", open_result)
+        //         }
+        //     }
+        // }
 
         if context.is_key_pressed(KeyboardKey::KEY_W) && context.is_key_down(MOD_KEY) {
             self.close_document();
