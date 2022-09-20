@@ -1,9 +1,10 @@
 #![windows_subsystem = "windows"]
 
-use std::borrow::BorrowMut;
+use std::collections::HashMap;
 
-use application::Application;
+use chunkprovider::metaprovider::MetaProvider;
 use raylib::prelude::*;
+use traits::IChunkProvider;
 
 pub mod application;
 pub mod archive;
@@ -13,10 +14,6 @@ pub mod processing;
 pub mod structs;
 pub mod traits;
 pub mod unarr;
-
-//Constants and info for the whole application
-const APP_TITLE: &str = "Manga Viewer";
-const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
 fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread, size: i32) -> Font {
     let font: Font = rl
@@ -31,108 +28,241 @@ fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread, size: i32) -> Font {
     font
 }
 
-fn main() {
-    //Initialze RayGUI
-    let (mut rl, thread) = init()
-        //Set Window Size
-        .size(700, 400)
-        //Make window resizable
-        .resizable()
-        //Set Window Title
-        .title("Manga Viewer")
-        //Finally call build to get the context initialized
-        .build();
+pub trait ImageProvider<T> {
+    fn get_texture(&mut self, id: T) -> Option<Texture2D>;
+    fn update_image(&mut self, id: T, image: Image);
+    fn load_resources(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+    ) -> Result<(), String>;
+}
 
-    let logo_data = include_bytes!("../images/icon.png");
-    let mut data = Vec::new();
-    data.extend_from_slice(logo_data);
+pub struct MangaViewerStateMachine {
+    pub current_chunk_index: usize,
+    pub offset: f32,
+}
 
-    let mut logo_image = Image::load_image_from_mem(".png", &data, logo_data.len() as i32).unwrap();
-    logo_image.resize(50, 50);
-    let logo_texture = rl.load_texture_from_image(&thread, &logo_image).unwrap();
+pub enum ApplicationTexture {
+    ApplicationIcon,
+    RecentDocumentThumbnail { index: u8 },
+}
 
-    //Disable closing on Escape key
-    rl.set_exit_key(None);
+pub struct ApplicationResources {
+    pub images: Box<dyn ImageProvider<ApplicationTexture>>,
+}
 
-    //Set target FPS for the application to 30
-    rl.set_target_fps(30);
+pub struct MangaViewer {
+    pub state: MangaViewerStateMachine,
+    pub provider: Box<dyn IChunkProvider>,
+    pub resources: ApplicationResources,
+}
 
-    let gui_font = rl
-        .load_font_ex(
-            &thread,
-            "./fonts/Roboto-Light.ttf",
-            12,
-            FontLoadEx::Default(255),
-        )
-        .unwrap();
-
-    //Format the Version string
-    let app_version_string = format!("{:}.{:2}.{:2}", APP_VERSION.0, APP_VERSION.1, APP_VERSION.2);
-
-    //Instantiate the application
-    let mut app: Application = Application::new(&mut rl, &thread, logo_texture);
-
-    //Padding for the main UI
-    const PADDING: f32 = 10.0;
-
-    let title_font = load_font(&mut rl, &thread, 15);
-    let subtitle_font = load_font(&mut rl, &thread, 20);
-
-    //RayLib's mainloop
-    while !rl.borrow_mut().window_should_close() {
-        app.load_textures(rl.borrow_mut(), &thread);
-
-        //Clear query vec
-        app.image_queries.clear();
-
-        if rl.is_file_dropped() {
-            if let Ok(_) = app.open_document(&rl.get_dropped_files()[0]) {
-            } else {
-            }
-            rl.clear_dropped_files();
-        }
-
-        //Get the RL Context
-        let mut context = rl.begin_drawing(&thread);
-        context.gui_set_font(&gui_font);
-
-        //Cache screen rectangle, adding offsets and correcting width/height
-        let screen_rect = Rectangle::new(
-            PADDING,
-            PADDING + 30f32,
-            context.get_screen_width() as f32 - 2f32 * PADDING,
-            context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
-        );
-
-        //Clear the screen's background
-        context.clear_background(Color::WHITE);
-
-        //Draw the application
-        app.draw(screen_rect, &mut context);
-
-        //Draw Application Logo
-        context.draw_texture(&app.logo_texture, 5, 5, Color::WHITE);
-
-        //Draw the header and version
-        context.draw_text_ex(
-            &subtitle_font,
-            APP_TITLE,
-            Vector2::new(55.0, 15.0),
-            (&subtitle_font).baseSize as f32,
-            0.0,
-            Color::BLACK,
-        );
-
-        context.draw_text_ex(
-            &title_font,
-            &app_version_string,
-            Vector2::new(120.0, 30.0),
-            (&title_font).baseSize as f32,
-            0.0,
-            Color::DARKGRAY,
-        );
+impl MangaViewer {
+    pub fn new() -> Result<MangaViewer, String> {
+        Ok(MangaViewer {
+            provider: Box::new(MetaProvider::new()),
+            state: MangaViewerStateMachine::default(),
+            resources: ApplicationResources::default(),
+        })
     }
 
-    //Unload current provider, so metadata gets saved on app quit
-    app.provider.unload();
+    pub fn run(&mut self) -> Result<(), String> {
+        let (mut rl, thread) = self.init()?;
+
+        while !rl.window_should_close() {
+            self.load_resources(&mut rl, &thread);
+
+            let mut context = rl.begin_drawing(&thread);
+
+            context.clear_background(Color::WHITE);
+
+            self.draw_logo();
+        }
+
+        Ok(())
+    }
+
+    fn init(&self) -> Result<(RaylibHandle, RaylibThread), String> {
+        let (rl, thread) = init()
+            //Set Window Size
+            .size(700, 400)
+            //Make window resizable
+            .resizable()
+            //Set Window Title
+            .title("Manga Viewer")
+            //Finally call build to get the context initialized
+            .build();
+
+        Ok((rl, thread))
+    }
+
+    fn draw_logo(&self) {}
+
+    fn load_resources(&mut self, rl: &mut RaylibHandle, thread: &RaylibThread) {
+        self.resources.images.load_resources(rl, thread);
+    }
+}
+
+fn main() {
+    eprintln!("Running");
+    if let Ok(mut manga_viewer) = MangaViewer::new() {
+        if let Err(error) = manga_viewer.run() {
+            eprintln!("Manga Viewer finished with error message: '{error}'");
+        }
+    }
+    eprintln!("Done");
+
+    //Initialze RayGUI
+    // let (mut rl, thread) = init()
+    //     //Set Window Size
+    //     .size(700, 400)
+    //     //Make window resizable
+    //     .resizable()
+    //     //Set Window Title
+    //     .title("Manga Viewer")
+    //     //Finally call build to get the context initialized
+    //     .build();
+
+    // let logo_data = include_bytes!("../images/icon.png");
+    // let mut data = Vec::new();
+    // data.extend_from_slice(logo_data);
+
+    // let mut logo_image = Image::load_image_from_mem(".png", &data, logo_data.len() as i32).unwrap();
+    // logo_image.resize(50, 50);
+    // let logo_texture = rl.load_texture_from_image(&thread, &logo_image).unwrap();
+
+    // //Disable closing on Escape key
+    // rl.set_exit_key(None);
+
+    // //Set target FPS for the application to 30
+    // rl.set_target_fps(30);
+
+    // let gui_font = rl
+    //     .load_font_ex(
+    //         &thread,
+    //         "./fonts/Roboto-Light.ttf",
+    //         12,
+    //         FontLoadEx::Default(255),
+    //     )
+    //     .unwrap();
+
+    // //Format the Version string
+    // let app_version_string = format!("{:}.{:2}.{:2}", APP_VERSION.0, APP_VERSION.1, APP_VERSION.2);
+
+    // //Instantiate the application
+    // let mut app: Application = Application::new(&mut rl, &thread, logo_texture);
+
+    // //Padding for the main UI
+    // const PADDING: f32 = 10.0;
+
+    // let title_font = load_font(&mut rl, &thread, 15);
+    // let subtitle_font = load_font(&mut rl, &thread, 20);
+
+    // //RayLib's mainloop
+    // while !rl.borrow_mut().window_should_close() {
+    //     app.load_textures(rl.borrow_mut(), &thread);
+
+    //     //Clear query vec
+    //     app.image_queries.clear();
+
+    //     if rl.is_file_dropped() {
+    //         if let Ok(_) = app.open_document(&rl.get_dropped_files()[0]) {
+    //         } else {
+    //         }
+    //         rl.clear_dropped_files();
+    //     }
+
+    //     //Get the RL Context
+    //     let mut context = rl.begin_drawing(&thread);
+    //     context.gui_set_font(&gui_font);
+
+    //     //Cache screen rectangle, adding offsets and correcting width/height
+    //     let screen_rect = Rectangle::new(
+    //         PADDING,
+    //         PADDING + 30f32,
+    //         context.get_screen_width() as f32 - 2f32 * PADDING,
+    //         context.get_screen_height() as f32 - 2f32 * PADDING - 30f32,
+    //     );
+
+    //     //Clear the screen's background
+    //     context.clear_background(Color::WHITE);
+
+    //     //Draw the application
+    //     app.draw(screen_rect, &mut context);
+
+    //     //Draw Application Logo
+    //     context.draw_texture(&app.logo_texture, 5, 5, Color::WHITE);
+
+    //     //Draw the header and version
+    //     context.draw_text_ex(
+    //         &subtitle_font,
+    //         APP_TITLE,
+    //         Vector2::new(55.0, 15.0),
+    //         (&subtitle_font).baseSize as f32,
+    //         0.0,
+    //         Color::BLACK,
+    //     );
+
+    //     context.draw_text_ex(
+    //         &title_font,
+    //         &app_version_string,
+    //         Vector2::new(120.0, 30.0),
+    //         (&title_font).baseSize as f32,
+    //         0.0,
+    //         Color::DARKGRAY,
+    //     );
+    // }
+
+    // //Unload current provider, so metadata gets saved on app quit
+    // app.provider.unload();
+}
+
+struct ImageCache {
+    pub image_queue: Vec<Image>,
+    pub textures: HashMap<ApplicationTexture, Texture2D>,
+}
+
+impl MangaViewerStateMachine {
+    fn default() -> MangaViewerStateMachine {
+        MangaViewerStateMachine {
+            current_chunk_index: 0,
+            offset: 0.0,
+        }
+    }
+}
+
+impl ApplicationResources {
+    fn default() -> ApplicationResources {
+        ApplicationResources {
+            images: Box::new(ImageCache::new()),
+        }
+    }
+}
+
+impl ImageProvider<ApplicationTexture> for ImageCache {
+    fn get_texture(&mut self, id: ApplicationTexture) -> Option<Texture2D> {
+        return self.textures[ApplicationTexture::ApplicationIcon];
+    }
+
+    fn update_image(&mut self, id: ApplicationTexture, image: Image) {
+        todo!()
+    }
+
+    fn load_resources(
+        &mut self,
+        rl: &mut RaylibHandle,
+        thread: &RaylibThread,
+    ) -> Result<(), String> {
+        todo!()
+    }
+}
+
+impl ImageCache {
+    fn new() -> Self {
+        Self {
+            image_queue: Vec::new(),
+            textures: HashMap::new(),
+        }
+    }
 }
