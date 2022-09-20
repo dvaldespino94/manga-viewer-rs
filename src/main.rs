@@ -51,6 +51,8 @@ fn main() {
     logo_image.resize(50, 50);
     let logo_texture = rl.load_texture_from_image(&thread, &logo_image).unwrap();
 
+rl.set_window_icon(logo_image);    
+
     //Disable closing on Escape key
     rl.set_exit_key(None);
 
