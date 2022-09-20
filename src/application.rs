@@ -505,7 +505,7 @@ impl Application {
             (line_y) as i32,
             (rect.x + rect.width) as i32,
             (line_y) as i32,
-            (if (hovered && pressed) {
+            (if hovered && pressed {
                 Color::BLUE
             } else {
                 Color::GRAY

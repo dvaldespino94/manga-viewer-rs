@@ -175,7 +175,7 @@ impl Database {
                 ])
                 .expect("Error inserting Chunk row into db");
             }
-        }else{
+        } else {
             println!("Couldn't prepare statement to insert chunks into DB");
         }
 
