@@ -457,17 +457,15 @@ impl Application {
         thumbnail: Option<&Texture2D>,
     ) -> CardAction {
         if metadata.is_none() {
-            context.draw_rectangle_rounded_lines(
+            context.draw_rectangle_lines_ex(
                 Rectangle {
                     x: rect.x + 10.0,
                     y: rect.y + 10.0,
                     height: rect.height - 20.0,
                     width: rect.width - 20.0,
                 },
-                0.1,
-                5,
                 1,
-                Color::LIGHTGRAY,
+                Color::LIGHTGRAY.fade(0.2),
             );
 
             return CardAction::None;
@@ -480,19 +478,17 @@ impl Application {
             context.set_mouse_cursor(MouseCursor::MOUSE_CURSOR_POINTING_HAND);
         }
 
-        context.draw_rectangle_rounded_lines(
+        context.draw_rectangle_lines_ex(
             rect,
-            0.1,
-            5,
             1,
             if hovered {
                 if pressed {
                     Color::BLUE
                 } else {
-                    Color::DARKGRAY
+                    Color::DARKGRAY.fade(0.5)
                 }
             } else {
-                Color::LIGHTGRAY
+                Color::LIGHTGRAY.fade(0.1)
             },
         );
 
@@ -509,7 +505,12 @@ impl Application {
             (line_y) as i32,
             (rect.x + rect.width) as i32,
             (line_y) as i32,
-            Color::GRAY,
+            (if (hovered && pressed) {
+                Color::BLUE
+            } else {
+                Color::GRAY
+            })
+            .fade(0.5),
         );
 
         let source_rect = if hovered {
@@ -541,7 +542,7 @@ impl Application {
                 Color::WHITE,
             );
         }
-        
+
         let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
 
         let delete_button_is_hovered = hovered
