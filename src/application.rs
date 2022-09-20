@@ -528,18 +528,20 @@ impl Application {
             )
         };
 
-        context.draw_texture_pro(
-            thumbnail.unwrap(),
-            source_rect,
-            Rectangle {
-                height: rect.height - 20.0,
-                ..rect
-            },
-            Vector2::zero(),
-            0.0,
-            Color::WHITE,
-        );
-
+        if thumbnail.is_some() {
+            context.draw_texture_pro(
+                thumbnail.unwrap(),
+                source_rect,
+                Rectangle {
+                    height: rect.height - 20.0,
+                    ..rect
+                },
+                Vector2::zero(),
+                0.0,
+                Color::WHITE,
+            );
+        }
+        
         let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
 
         let delete_button_is_hovered = hovered
@@ -627,11 +629,11 @@ impl Application {
                     if index < self.recent_documents.len() {
                         let metadata = self.recent_documents.get(index).unwrap();
 
-                        let thumbnail = Some(if metadata.thumbnail.is_none() {
-                            &self.logo_texture
+                        let thumbnail = if metadata.thumbnail.is_none() {
+                            None
                         } else {
-                            &self.recent_thumbs[index]
-                        });
+                            Some(&self.recent_thumbs[index])
+                        };
 
                         match self.draw_recent_card(rect, context, Some(metadata), thumbnail) {
                             CardAction::None => {}
