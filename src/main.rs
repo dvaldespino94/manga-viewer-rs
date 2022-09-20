@@ -78,6 +78,12 @@ fn main() {
     let title_font = load_font(&mut rl, &thread, 15);
     let subtitle_font = load_font(&mut rl, &thread, 20);
 
+    #[cfg(target_os = "windows")]
+    const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_CONTROL;
+
+    #[cfg(target_os = "macos")]
+    const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_SUPER;
+
     //RayLib's mainloop
     while !rl.borrow_mut().window_should_close() {
         app.load_textures(rl.borrow_mut(), &thread);
@@ -95,6 +101,20 @@ fn main() {
         //Get the RL Context
         let mut context = rl.begin_drawing(&thread);
         context.gui_set_font(&gui_font);
+
+        if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
+            let fd = rfd::FileDialog::new();
+            if let Some(result) = fd.pick_folder() {
+                if let Err(open_result) = app.open_document(&String::from(result.to_str().unwrap()))
+                {
+                    eprintln!("Error opening document: {}", open_result)
+                }
+            }
+        }
+
+        if context.is_key_pressed(KeyboardKey::KEY_W) && context.is_key_down(MOD_KEY) {
+            app.close_document();
+        }
 
         //Cache screen rectangle, adding offsets and correcting width/height
         let screen_rect = Rectangle::new(

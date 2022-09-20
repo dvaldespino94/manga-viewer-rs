@@ -8,7 +8,7 @@ description="Simple Manga/Comic Viewer"
 raylib = "3.7.0"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 libc = "0.2.132"
-# nfd = "0.0.4"
+rfd = "*"
 # winres="*"
 
 [package.metadata.bundle]

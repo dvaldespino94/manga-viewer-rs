@@ -370,27 +370,6 @@ impl Application {
         let mut something_changed = false;
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
 
-        #[cfg(target_os = "windows")]
-        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_CONTROL;
-
-        #[cfg(target_os = "macos")]
-        const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_SUPER;
-
-        // if context.is_key_pressed(KeyboardKey::KEY_O) && context.is_key_down(MOD_KEY) {
-        //     let result =
-        //         nfd::open_dialog(None, None, nfd::DialogType::PickFolder).expect("Error in NFD");
-        //     if let Okay(path) = result {
-        //         eprintln!("Opening {}", path);
-        //         if let Err(open_result) = self.open_document(&path) {
-        //             eprintln!("Error opening document: {}", open_result)
-        //         }
-        //     }
-        // }
-
-        if context.is_key_pressed(KeyboardKey::KEY_W) && context.is_key_down(MOD_KEY) {
-            self.close_document();
-        }
-
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
             //Calculate width/height ratio
@@ -741,7 +720,7 @@ impl Application {
         }
     }
 
-    fn close_document(&mut self) {
+    pub fn close_document(&mut self) {
         let path = if let Some(last_document) = &self.current_document_path {
             last_document.clone()
         } else {
