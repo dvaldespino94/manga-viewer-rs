@@ -1,4 +1,6 @@
-use raylib::prelude::*;
+use raylib::{prelude::*, ffi::GetTime};
+
+use crate::application::get_time;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Chunk {
@@ -22,6 +24,8 @@ pub enum Message {
 //Store metadata for books, folders, etc...
 #[derive(Debug, Clone)]
 pub struct ComicMetadata {
+    //The last time the document was opened
+    pub last_time_opened: u64,
     //The comic's title
     pub title: String,
     //How many chunks were found last time(Might increase)
@@ -37,6 +41,7 @@ pub struct ComicMetadata {
 impl Default for ComicMetadata {
     fn default() -> Self {
         Self {
+            last_time_opened: get_time(),
             title: String::new(),
             chunk_count: 0,
             last_seen_chunk: 0,

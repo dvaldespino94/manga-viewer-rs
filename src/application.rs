@@ -1,4 +1,4 @@
-use std::{cmp::min, collections::HashMap, ffi::CString};
+use std::{cmp::min, collections::HashMap, ffi::CString, time::SystemTime};
 
 use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
 use raylib::prelude::*;
@@ -656,9 +656,6 @@ impl Application {
                             }
                             CardAction::RemoveDocument => {
                                 self.recent_documents.remove(index);
-                                self.db
-                                    .save_recents(&self.recent_documents)
-                                    .expect("Error saving recents");
                                 return true;
                             }
                         }
@@ -678,7 +675,6 @@ impl Application {
     }
 
     pub fn open_document(&mut self, path: &String) -> Result<(), String> {
-        self.write_recents();
         self.title_changed = true;
 
         self.close_document();
@@ -692,7 +688,7 @@ impl Application {
                 return Err("Couldn't find a situable provider".to_string());
             }
             Ok(_) => {
-                let metadata = if let Some(md) = self.db.metadata_for(path) {
+                let mut metadata = if let Some(md) = self.db.metadata_for(path) {
                     md
                 } else {
                     eprintln!("Using default metadata for {path}!");
@@ -703,6 +699,7 @@ impl Application {
                         last_seen_chunk: 0,
                         path: String::from(path),
                         thumbnail: None,
+                        last_time_opened: unsafe { get_time() } as u64,
                     };
 
                     //Save metadata for this document
@@ -713,12 +710,11 @@ impl Application {
                     new_metadata
                 };
 
+                metadata.last_time_opened = get_time();
                 self.current_chunk_index = metadata.last_seen_chunk;
                 self.recent_documents.push(metadata.clone());
 
-                if let Err(error) = self.db.save_recents(&self.recent_documents) {
-                    eprintln!("Error occured saving recents: {:?}", error);
-                }
+                self.db.save_metadata(&self.recent_documents.iter().collect());
 
                 self.current_document_path = Some(metadata.path);
 
@@ -727,12 +723,6 @@ impl Application {
         }
 
         Ok(())
-    }
-
-    fn write_recents(&mut self) {
-        if let Err(error) = self.db.save_recents(&self.recent_documents) {
-            eprintln!("Error writing recents: {:?}", error);
-        }
     }
 
     pub fn close_document(&mut self) {
@@ -748,6 +738,7 @@ impl Application {
             last_seen_chunk: self.current_chunk_index,
             path,
             thumbnail: None,
+            last_time_opened: get_time(),
         };
         self.db
             .save_metadata(&Vec::from([&metadata]))
@@ -783,6 +774,13 @@ impl Application {
             .filter(|x| x.rect.width > 0.0)
             .collect()
     }
+}
+
+pub fn get_time() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 fn draw_text_centered(

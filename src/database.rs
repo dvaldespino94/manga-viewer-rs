@@ -17,41 +17,23 @@ impl Database {
             .prepare(
                 "
                         SELECT
-                            Metadata.*
+                            *
                         FROM
-                            Recents
-                            LEFT JOIN Metadata ON Recents.path = Metadata.path
+                            Metadata
+                            ORDER BY last_time_open DESC
                             LIMIT 8;",
             )
             .expect("Error getting recent list from DB");
 
         let mut rows = query.query([]).expect("Error getting rows from DB");
 
-        rows.mapped(sqlite_row_to_metadata)
+        let mut metadata = rows
+            .mapped(sqlite_row_to_metadata)
             .filter(|x| x.is_ok())
             .map(|x| x.unwrap())
-            .collect()
-    }
-
-    pub fn save_recents(&mut self, recents: &Vec<ComicMetadata>) -> Result<(), rusqlite::Error> {
-        self.conn
-            .execute("DELETE FROM Recents;", [])
-            .expect("Error clearing recents table");
-
-        for recent in recents.iter() {
-            let tx = self
-                .conn
-                .transaction()
-                .expect("Couldn't start a transation");
-            tx.execute(
-                "INSERT OR REPLACE INTO Recents(path) VALUES(?);",
-                [recent.path.to_string()],
-            )
-            .expect("Error inserting Recent into Database");
-            tx.commit().expect("Error writing changes to DB");
-        }
-
-        Ok(())
+            .collect::<Vec<ComicMetadata>>();
+        metadata.sort_by(|a, b| b.last_time_opened.cmp(&a.last_time_opened));
+        metadata
     }
 
     pub fn save_metadata(&mut self, metadata: &Vec<&ComicMetadata>) -> Result<(), rusqlite::Error> {
@@ -63,13 +45,14 @@ impl Database {
         for md in metadata.iter() {
             eprintln!("Inserting {md:?} into DB");
             tx.execute(
-                "INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?)",
-                [
-                    md.path.to_string(),
-                    md.chunk_count.to_string(),
-                    md.last_seen_chunk.to_string(),
+                "INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?,?)",
+                (
+                    md.last_time_opened,
+                    &md.path,
+                    md.chunk_count,
+                    md.last_seen_chunk,
                     String::new(),
-                ],
+                ),
             )
             .expect("Error inserting metadata into transaction");
         }
@@ -85,6 +68,7 @@ impl Database {
             "
             CREATE TABLE IF NOT EXISTS
             Metadata(
+                last_time_open INTEGER,
                 path TEXT PRIMARY KEY,
                 chunk_count INTEGER,
                 last_chunk INTEGER,
@@ -93,16 +77,6 @@ impl Database {
             [],
         )
         .expect("Error creating metadata table");
-
-        conn.execute(
-            "
-            CREATE TABLE IF NOT EXISTS
-            Recents(
-                path TEXT UNIQUE
-            );",
-            [],
-        )
-        .expect("Error creating recents table");
 
         conn.execute(
             "
@@ -118,7 +92,7 @@ impl Database {
             );",
             [],
         )
-        .expect("Error creating recents table");
+        .expect("Error creating chunks table");
 
         Self { conn }
     }
@@ -198,9 +172,10 @@ fn sqlite_row_to_chunk(row: &Row) -> Result<Chunk, Error> {
 }
 
 fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
-    let path: String = row.get(0)?;
-    let chunk_count: usize = row.get(1)?;
-    let last_seen_chunk: usize = row.get(2)?;
+    let last_time_opened: u64 = row.get(0)?;
+    let path: String = row.get(1)?;
+    let chunk_count: usize = row.get(2)?;
+    let last_seen_chunk: usize = row.get(3)?;
 
     let path_object = Path::new(path.as_str());
     let title = String::from(path_object.file_name().unwrap().to_str().unwrap());
@@ -208,6 +183,7 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
     eprintln!("ROW: {path} {title} {chunk_count} {last_seen_chunk}");
 
     Ok(ComicMetadata {
+        last_time_opened,
         title,
         chunk_count,
         last_seen_chunk,
