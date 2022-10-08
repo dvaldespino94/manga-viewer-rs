@@ -100,6 +100,7 @@ pub struct Application {
     pub recent_thumbs: Vec<Texture2D>,
     pub recent_thumbs_data: Vec<Vec<u8>>,
     show_dots_timeout: f32,
+    title_changed: bool,
 }
 
 impl Application {
@@ -127,10 +128,20 @@ impl Application {
             recent_thumbs: Vec::new(),
             recent_thumbs_data: Vec::new(),
             show_dots_timeout: 5.0,
+            title_changed: false,
         }
     }
 
     pub fn load_textures(&mut self, context: &mut RaylibHandle, thread: &RaylibThread) {
+        if self.title_changed {
+            if let Some(title) = &self.current_document_path {
+                context.set_window_title(thread, format!("Manga Viewer - {title}").as_str());
+            } else {
+                context.set_window_title(thread, "Manga Viewer");
+            }
+            self.title_changed = false;
+        }
+
         //Check for texture queries
         for query in self.image_queries.iter() {
             eprintln!("Loading texture {:?}", query);
@@ -668,6 +679,7 @@ impl Application {
 
     pub fn open_document(&mut self, path: &String) -> Result<(), String> {
         self.write_recents();
+        self.title_changed = true;
 
         self.close_document();
 
