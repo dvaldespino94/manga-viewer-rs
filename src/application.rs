@@ -110,7 +110,7 @@ impl Application {
         let mut db = Database::new();
 
         //Return a new application
-        Self {
+        let mut app = Self {
             current_chunk_index: 0,
             provider,
             current_chunk: None,
@@ -118,7 +118,7 @@ impl Application {
             textures: HashMap::new(),
             scroll: 0.0,
             smoothed_scroll: 0.0,
-            recent_documents: db.get_recents(),
+            recent_documents: Vec::new(),
             texture_loading_order: Vec::new(),
             errors: Vec::new(),
             fonts: ApplicationFonts::new(rl, thread),
@@ -129,7 +129,11 @@ impl Application {
             recent_thumbs_data: Vec::new(),
             show_dots_timeout: 5.0,
             title_changed: false,
-        }
+        };
+
+        app.update_recents();
+
+        app
     }
 
     pub fn load_textures(&mut self, context: &mut RaylibHandle, thread: &RaylibThread) {
@@ -142,17 +146,56 @@ impl Application {
             self.title_changed = false;
         }
 
+        //Load thumbnail textures from metadata
+        {
+            let default_image = Image::gen_image_checked(50, 50, 4, 4, Color::RED, Color::GREEN);
+
+            for data in self.recent_thumbs_data.iter() {
+                let mut success = false;
+                match Image::load_image_from_mem(".jpg", data, data.len() as i32) {
+                    Ok(img) => match context.load_texture_from_image(thread, &img) {
+                        Ok(texture) => {
+                            self.recent_thumbs.push(texture);
+                            success = true;
+                        }
+                        Err(err) => {
+                            eprintln!("Error loading texture: '{err:?}'!");
+                        }
+                    },
+                    Err(err) => eprintln!("Error loading image: '{err:?}'!"),
+                }
+
+                if !success {
+                    let default_texture = context
+                        .load_texture_from_image(thread, &default_image)
+                        .unwrap();
+                    self.recent_thumbs.push(default_texture);
+                }
+            }
+            self.recent_thumbs_data.clear();
+        }
+
         //Check for texture queries
         for query in self.image_queries.iter() {
             eprintln!("Loading texture {:?}", query);
 
             let provider = &mut self.provider;
             //Try to get the image from the provider
-            if let Some(image) = provider.get_image(*query) {
+            if let Some(mut image) = provider.get_image(*query) {
                 //Get the texture from the image
                 let value = Some(context.load_texture_from_image(thread, image).unwrap());
                 //Insert the texture into the app's index/texture hash
                 self.textures.insert(*query, value);
+
+                //Store first page as thumbnail
+                if *query == 0 {
+                    let mut img = image.clone();
+                    img.resize(128, 256);
+                    img.export_image("/tmp/manga_viewer_thumb.jpg");
+                    if let Ok(data) = std::fs::read("/tmp/manga_viewer_thumb.jpg") {
+                        self.recent_documents[0].thumbnail = Some(data);
+                    }
+                }
 
                 if self.textures.len() >= 4 {
                     self.textures
@@ -398,7 +441,7 @@ impl Application {
                     screen_size.height * 0.1
                 } else {
                     //If no keys were detected then try to get mousewheel's value
-                    context.get_mouse_wheel_move() * 0.1*(context.get_screen_height() as f32)
+                    context.get_mouse_wheel_move() * 0.1 * (context.get_screen_height() as f32)
                 };
 
                 //Max possible offset
@@ -714,15 +757,27 @@ impl Application {
                 self.current_chunk_index = metadata.last_seen_chunk;
                 self.recent_documents.push(metadata.clone());
 
-                self.db.save_metadata(&self.recent_documents.iter().collect());
+                self.db
+                    .save_metadata(&self.recent_documents.iter().collect());
 
                 self.current_document_path = Some(metadata.path);
 
-                self.recent_documents = self.db.get_recents();
+                self.update_recents();
             }
         }
 
         Ok(())
+    }
+
+    fn update_recents(&mut self) {
+        self.recent_documents = self.db.get_recents();
+        self.recent_thumbs.clear();
+        self.recent_thumbs_data.clear();
+
+        for recent in self.recent_documents.iter() {
+            self.recent_thumbs_data
+                .push(recent.thumbnail.as_ref().unwrap_or(&Vec::new()).to_vec());
+        }
     }
 
     pub fn close_document(&mut self) {
@@ -732,19 +787,22 @@ impl Application {
             return;
         };
 
+        let current_metadata = self.recent_documents.first().unwrap();
         let metadata = ComicMetadata {
-            title: String::new(),
             chunk_count: self.provider.chunk_count(),
             last_seen_chunk: self.current_chunk_index,
-            path,
-            thumbnail: None,
             last_time_opened: get_time(),
+            title: current_metadata.title.to_owned(),
+            path,
+            thumbnail: current_metadata.thumbnail.clone(),
         };
+
         self.db
             .save_metadata(&Vec::from([&metadata]))
             .expect("Error saving metadata");
 
         let all_chunks = self.all_chunks();
+
         self.db.save_chunk_cache(metadata.path, all_chunks);
 
         self.textures.clear();

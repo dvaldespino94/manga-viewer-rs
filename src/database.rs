@@ -51,7 +51,7 @@ impl Database {
                     &md.path,
                     md.chunk_count,
                     md.last_seen_chunk,
-                    String::new(),
+                    md.thumbnail.as_ref().unwrap_or(&Vec::new()),
                 ),
             )
             .expect("Error inserting metadata into transaction");
@@ -72,7 +72,7 @@ impl Database {
                 path TEXT PRIMARY KEY,
                 chunk_count INTEGER,
                 last_chunk INTEGER,
-                icon TEXT
+                icon BLOB
             )",
             [],
         )
@@ -139,14 +139,14 @@ impl Database {
 
         if let Ok(mut stmt) = tx.prepare("INSERT INTO Chunks VALUES(?,?,?,?,?,?);") {
             for c in all_chunks {
-                stmt.execute([
+                stmt.execute((
                     &path,
-                    &c.rect.x.to_string(),
-                    &c.rect.y.to_string(),
-                    &c.rect.width.to_string(),
-                    &c.rect.height.to_string(),
-                    &c.texture_index.to_string(),
-                ])
+                    c.rect.x,
+                    c.rect.y,
+                    c.rect.width,
+                    c.rect.height,
+                    c.texture_index,
+                ))
                 .expect("Error inserting Chunk row into db");
             }
         } else {
@@ -179,6 +179,7 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
 
     let path_object = Path::new(path.as_str());
     let title = String::from(path_object.file_name().unwrap().to_str().unwrap());
+    let thumbnail: Vec<u8> = row.get(4).unwrap_or_default();
 
     eprintln!("ROW: {path} {title} {chunk_count} {last_seen_chunk}");
 
@@ -188,6 +189,6 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
         chunk_count,
         last_seen_chunk,
         path,
-        thumbnail: None,
+        thumbnail: Some(thumbnail.to_vec()),
     })
 }
