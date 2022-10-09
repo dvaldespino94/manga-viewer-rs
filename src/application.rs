@@ -398,7 +398,7 @@ impl Application {
                     screen_size.height * 0.1
                 } else {
                     //If no keys were detected then try to get mousewheel's value
-                    context.get_mouse_wheel_move() * 2.0
+                    context.get_mouse_wheel_move() * 0.1*(context.get_screen_height() as f32)
                 };
 
                 //Max possible offset
