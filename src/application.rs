@@ -601,24 +601,24 @@ impl Application {
             );
         }
 
-        let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
+        // let delete_button_center = Vector2::new(rect.x + rect.width - 12.0, rect.y + 12.0);
 
-        let delete_button_is_hovered = hovered
-            && check_collision_point_circle(
-                context.get_mouse_position(),
-                delete_button_center,
-                rect.width / 8.0,
-            );
+        // let delete_button_is_hovered = hovered
+        //     && check_collision_point_circle(
+        //         context.get_mouse_position(),
+        //         delete_button_center,
+        //         rect.width / 8.0,
+        //     );
 
-        if delete_button_is_hovered {
-            context.draw_circle_v(delete_button_center, rect.width / 8.0, Color::RED.fade(0.5));
-        }
+        // if delete_button_is_hovered {
+        //     context.draw_circle_v(delete_button_center, rect.width / 8.0, Color::RED.fade(0.5));
+        // }
 
-        if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON)
-            && delete_button_is_hovered
-        {
-            return CardAction::RemoveDocument;
-        }
+        // if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON)
+            // && delete_button_is_hovered
+        // {
+        //     return CardAction::RemoveDocument;
+        // }
 
         if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON) && hovered {
             return CardAction::OpenDocument;
