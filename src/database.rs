@@ -43,7 +43,6 @@ impl Database {
             .expect("Couldn't start a transation");
 
         for md in metadata.iter() {
-            eprintln!("Inserting {md:?} into DB");
             tx.execute(
                 "INSERT OR REPLACE INTO Metadata VALUES(?,?,?,?,?)",
                 (
@@ -189,6 +188,10 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
         chunk_count,
         last_seen_chunk,
         path,
-        thumbnail: Some(thumbnail.to_vec()),
+        thumbnail: if thumbnail.is_empty() {
+            None
+        } else {
+            Some(thumbnail.to_vec())
+        },
     })
 }

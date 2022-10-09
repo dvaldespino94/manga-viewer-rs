@@ -4,6 +4,11 @@ use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
 use raylib::prelude::*;
 
 const DOTS_SHOW_TIMEOUT: f32 = 1.5;
+const MAX_RECENT_DOCUMENTS: usize = 8;
+
+const CARD_WIDTH: usize = 100;
+const CARD_HEIGHT: usize = 130;
+const CARD_SPACING: usize = 10;
 
 use crate::{
     structs::{Chunk, ComicMetadata},
@@ -188,9 +193,9 @@ impl Application {
                 self.textures.insert(*query, value);
 
                 //Store first page as thumbnail
-                if *query == 0 {
+                if *query == 0 && self.recent_documents[0].thumbnail.is_none() {
                     let mut img = image.clone();
-                    img.resize(128, 256);
+                    img.resize(CARD_WIDTH as i32, CARD_HEIGHT as i32);
                     img.export_image("/tmp/manga_viewer_thumb.jpg");
                     if let Ok(data) = std::fs::read("/tmp/manga_viewer_thumb.jpg") {
                         self.recent_documents[0].thumbnail = Some(data);
@@ -567,30 +572,29 @@ impl Application {
             .fade(0.5),
         );
 
-        let source_rect = if hovered {
-            Rectangle::new(
-                0.0,
-                0.0,
-                self.logo_texture.width as f32,
-                self.logo_texture.height as f32,
-            )
-        } else {
-            Rectangle::new(
-                -5.0,
-                -5.0,
-                (self.logo_texture.width + 10) as f32,
-                (self.logo_texture.height + 10) as f32,
-            )
-        };
+        if let Some(thumbnail) = thumbnail {
+            let source_rect = if hovered {
+                Rectangle::new(
+                    10.0,
+                    10.0,
+                    thumbnail.width as f32 - 20.0,
+                    thumbnail.height as f32 - 20.0,
+                )
+            } else {
+                Rectangle::new(0.0, 0.0, thumbnail.width as f32, thumbnail.height as f32)
+            };
 
-        if thumbnail.is_some() {
+            let dest_rect = Rectangle {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height - 20.0,
+            };
+
             context.draw_texture_pro(
-                thumbnail.unwrap(),
+                thumbnail,
                 source_rect,
-                Rectangle {
-                    height: rect.height - 20.0,
-                    ..rect
-                },
+                dest_rect,
                 Vector2::zero(),
                 0.0,
                 Color::WHITE,
@@ -649,11 +653,6 @@ impl Application {
                 Color::BLACK,
             );
 
-            const MAX_RECENT_DOCUMENTS: usize = 8;
-            const CARD_WIDTH: usize = 70;
-            const CARD_HEIGHT: usize = 100;
-            const CARD_SPACING: usize = 10;
-
             let cols = min(
                 screen_rect.width as usize / (CARD_WIDTH + CARD_SPACING / 2),
                 4,
@@ -687,7 +686,7 @@ impl Application {
                         let thumbnail = if metadata.thumbnail.is_none() {
                             None
                         } else {
-                            Some(&self.recent_thumbs[index])
+                            self.recent_thumbs.get(index)
                         };
 
                         match self.draw_recent_card(rect, context, Some(metadata), thumbnail) {
@@ -814,6 +813,8 @@ impl Application {
         self.smoothed_scroll = 0.0;
         self.provider.unload();
         self.current_document_path = None;
+
+        self.update_recents();
     }
 
     fn all_chunks(&mut self) -> Vec<Chunk> {
