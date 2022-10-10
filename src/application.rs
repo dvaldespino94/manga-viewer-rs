@@ -6,8 +6,8 @@ use raylib::prelude::*;
 const DOTS_SHOW_TIMEOUT: f32 = 1.5;
 const MAX_RECENT_DOCUMENTS: usize = 8;
 
-const CARD_WIDTH: usize = 100;
-const CARD_HEIGHT: usize = 130;
+const CARD_WIDTH: usize = 120;
+const CARD_HEIGHT: usize = CARD_WIDTH * 16 / 9;
 const CARD_SPACING: usize = 10;
 
 use crate::{
@@ -141,6 +141,7 @@ impl Application {
         app
     }
 
+    #[allow(unused_must_use)]
     pub fn load_textures(&mut self, context: &mut RaylibHandle, thread: &RaylibThread) {
         if self.title_changed {
             if let Some(title) = &self.current_document_path {
@@ -177,6 +178,7 @@ impl Application {
                     self.recent_thumbs.push(default_texture);
                 }
             }
+            
             self.recent_thumbs_data.clear();
         }
 
@@ -194,12 +196,15 @@ impl Application {
 
                 //Store first page as thumbnail
                 if *query == 0 && self.recent_documents[0].thumbnail.is_none() {
+                    const TEMP_FILENAME: &str = ".manga_viewer_thumb.jpg";
                     let mut img = image.clone();
                     img.resize(CARD_WIDTH as i32, CARD_HEIGHT as i32);
-                    img.export_image("/tmp/manga_viewer_thumb.jpg");
-                    if let Ok(data) = std::fs::read("/tmp/manga_viewer_thumb.jpg") {
+                    img.export_image(TEMP_FILENAME);
+                    if let Ok(data) = std::fs::read(TEMP_FILENAME) {
                         self.recent_documents[0].thumbnail = Some(data);
                     }
+
+                    std::fs::remove_file(TEMP_FILENAME);
                 }
 
                 if self.textures.len() >= 4 {
@@ -615,7 +620,7 @@ impl Application {
         // }
 
         // if context.is_mouse_button_released(MouseButton::MOUSE_LEFT_BUTTON)
-            // && delete_button_is_hovered
+        // && delete_button_is_hovered
         // {
         //     return CardAction::RemoveDocument;
         // }
