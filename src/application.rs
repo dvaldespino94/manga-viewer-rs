@@ -106,6 +106,7 @@ pub struct Application {
     pub recent_thumbs_data: Vec<Vec<u8>>,
     show_dots_timeout: f32,
     title_changed: bool,
+    can_scroll: bool,
 }
 
 impl Application {
@@ -134,6 +135,7 @@ impl Application {
             recent_thumbs_data: Vec::new(),
             show_dots_timeout: 5.0,
             title_changed: false,
+            can_scroll: true,
         };
 
         app.update_recents();
@@ -435,45 +437,67 @@ impl Application {
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
         let mut chunk_index_offset: i32 = 0;
 
+        if context.is_key_released(KeyboardKey::KEY_UP)
+            || context.is_key_released(KeyboardKey::KEY_DOWN)
+        {
+            self.can_scroll = true;
+        }
+
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
-            //Calculate width/height ratio
-            let coeff = chunk.rect.height / chunk.rect.width;
-            //Calculate the chunk's screen-size
-            real_size = Vector2::new(screen_size.width, screen_size.width * coeff);
+            if self.can_scroll {
+                //Calculate width/height ratio
+                let coeff = chunk.rect.height / chunk.rect.width;
+                //Calculate the chunk's screen-size
+                real_size = Vector2::new(screen_size.width, screen_size.width * coeff);
 
-            //If the chunk is taller than the screen then enable vertical scroll
-            if real_size.y > screen_size.height {
-                self.scroll += if context.is_key_down(KeyboardKey::KEY_DOWN) {
-                    //Handle DOWN arrow
-                    screen_size.height * -0.1
-                } else if context.is_key_down(KeyboardKey::KEY_UP) {
-                    //Handle UP arrow
-                    screen_size.height * 0.1
+                //If the chunk is taller than the screen then enable vertical scroll
+                if real_size.y > screen_size.height {
+                    self.scroll += if context.is_key_down(KeyboardKey::KEY_DOWN) {
+                        //Handle DOWN arrow
+                        screen_size.height * -0.1
+                    } else if context.is_key_down(KeyboardKey::KEY_UP) {
+                        //Handle UP arrow
+                        screen_size.height * 0.1
+                    } else {
+                        //If no keys were detected then try to get mousewheel's value
+                        context.get_mouse_wheel_move() * 0.1 * (context.get_screen_height() as f32)
+                    };
+
+                    //Max possible offset
+                    let max_offset = -real_size.y + screen_size.height;
+
+                    //Keep scroll in bounds
+                    if self.scroll > 0.0 {
+                        self.scroll = 0.0;
+                        if context.is_key_pressed(KeyboardKey::KEY_UP) {
+                            chunk_index_offset = -1;
+                            something_changed = true;
+                            self.can_scroll = false;
+                            self.scroll = -1000.0;
+                        }
+                    } else if self.scroll < max_offset {
+                        self.scroll = max_offset;
+                        if context.is_key_pressed(KeyboardKey::KEY_DOWN) {
+                            chunk_index_offset = 1;
+                            something_changed = true;
+                            self.can_scroll = false;
+                            self.scroll = 0.0;
+                        }
+                    }
                 } else {
-                    //If no keys were detected then try to get mousewheel's value
-                    context.get_mouse_wheel_move() * 0.1 * (context.get_screen_height() as f32)
-                };
-
-                //Max possible offset
-                let max_offset = -real_size.y + screen_size.height;
-
-                //Keep scroll in bounds
-                if self.scroll > 0.0 {
+                    //Reset scroll
                     self.scroll = 0.0;
-                } else if self.scroll < max_offset {
-                    self.scroll = max_offset;
-                }
-            } else {
-                //Reset scroll
-                self.scroll = 0.0;
-                if context.is_key_pressed(KeyboardKey::KEY_DOWN) {
-                    chunk_index_offset = 1;
-                    something_changed = true;
-                }
-                if context.is_key_pressed(KeyboardKey::KEY_UP) {
-                    chunk_index_offset = -1;
-                    something_changed = true;
+                    if context.is_key_pressed(KeyboardKey::KEY_DOWN) {
+                        chunk_index_offset = 1;
+                        something_changed = true;
+                        self.can_scroll = false;
+                    }
+                    if context.is_key_pressed(KeyboardKey::KEY_UP) {
+                        chunk_index_offset = -1;
+                        something_changed = true;
+                        self.can_scroll = false;
+                    }
                 }
             }
         }
@@ -508,10 +532,16 @@ impl Application {
         if something_changed {
             self.show_dots_timeout = DOTS_SHOW_TIMEOUT;
             let provider = &self.provider;
-            self.current_chunk_index =
-                (chunk_index_offset + (self.current_chunk_index as i32)) as usize;
-            if self.current_chunk_index >= provider.chunk_count() {
-                self.current_chunk_index = provider.chunk_count() - 1;
+
+            let new_current_chunk_index = chunk_index_offset + (self.current_chunk_index as i32);
+            if new_current_chunk_index < 0 {
+                self.current_chunk_index = 0;
+            } else {
+                self.current_chunk_index = new_current_chunk_index as usize;
+
+                if self.current_chunk_index >= provider.chunk_count() {
+                    self.current_chunk_index = provider.chunk_count() - 1;
+                }
             }
         }
 
