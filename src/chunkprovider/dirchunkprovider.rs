@@ -68,7 +68,7 @@ impl IChunkProvider for DirChunkProvider {
             if let Ok(dir) = path.read_dir() {
                 self.files = dir
                     .map(|element| element.unwrap().path().to_str().unwrap().to_string())
-                    .filter(|element| element.ends_with(".jpg") || element.ends_with(".png"))
+                    .filter(|element| element.to_lowercase().ends_with(".jpg") || element.to_lowercase().ends_with(".png"))
                     .collect();
             }
 
@@ -89,10 +89,10 @@ impl IChunkProvider for DirChunkProvider {
                 self.chunk_index = index;
             }
 
+            self.document_path = _path.to_string();
+
             //Preload first image
             self.get_image(0);
-
-            self.document_path = _path.to_string();
 
             return Ok(());
         }
@@ -101,13 +101,15 @@ impl IChunkProvider for DirChunkProvider {
     }
 
     fn get_image(&mut self, index: usize) -> Option<&raylib::texture::Image> {
-        eprintln!("Getting image {}", index);
+        eprintln!("Getting image {index}");
 
         if index >= self.files.len() {
+            eprintln!("Index out of range!");
             return None;
         }
 
         if self.images.contains_key(&index) {
+            eprintln!("Returning image from hash");
             return self.images.get(&index);
         }
 

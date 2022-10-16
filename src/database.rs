@@ -103,7 +103,7 @@ impl Database {
             sqlite_row_to_metadata,
         ) {
             Ok(metadata) => {
-                eprintln!("Got metadata for {path}: {metadata:?}");
+                // eprintln!("Got metadata for {path}: {metadata:?}");
                 return Some(metadata);
             }
             Err(error) => {
@@ -180,7 +180,7 @@ fn sqlite_row_to_metadata(row: &Row) -> Result<ComicMetadata, Error> {
     let title = String::from(path_object.file_name().unwrap().to_str().unwrap());
     let thumbnail: Vec<u8> = row.get(4).unwrap_or_default();
 
-    eprintln!("ROW: {path} {title} {chunk_count} {last_seen_chunk}");
+    // eprintln!("ROW: {path} {title} {chunk_count} {last_seen_chunk}");
 
     Ok(ComicMetadata {
         last_time_opened,
