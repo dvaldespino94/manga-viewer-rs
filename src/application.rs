@@ -178,7 +178,7 @@ impl Application {
                     self.recent_thumbs.push(default_texture);
                 }
             }
-            
+
             self.recent_thumbs_data.clear();
         }
 
@@ -433,6 +433,7 @@ impl Application {
         //Flag to signal that the user pressed next/prev or scrolled the image
         let mut something_changed = false;
         let mut real_size: Vector2 = Vector2::new(0.0, 0.0);
+        let mut chunk_index_offset: i32 = 0;
 
         //Handle user scroll only if there is a chunk
         if let Some(chunk) = &self.current_chunk {
@@ -466,6 +467,14 @@ impl Application {
             } else {
                 //Reset scroll
                 self.scroll = 0.0;
+                if context.is_key_pressed(KeyboardKey::KEY_DOWN) {
+                    chunk_index_offset = 1;
+                    something_changed = true;
+                }
+                if context.is_key_pressed(KeyboardKey::KEY_UP) {
+                    chunk_index_offset = -1;
+                    something_changed = true;
+                }
             }
         }
 
@@ -476,7 +485,7 @@ impl Application {
         if context.is_key_pressed(KeyboardKey::KEY_PAGE_DOWN)
             || context.is_key_pressed(KeyboardKey::KEY_RIGHT)
         {
-            self.current_chunk_index += 1;
+            chunk_index_offset = 1;
             something_changed = true;
 
             if !(self.provider.done_processing()
@@ -488,9 +497,7 @@ impl Application {
         } else if context.is_key_pressed(KeyboardKey::KEY_PAGE_UP)
             || context.is_key_pressed(KeyboardKey::KEY_LEFT)
         {
-            if self.current_chunk_index > 0 {
-                self.current_chunk_index -= 1;
-            }
+            chunk_index_offset = -1;
             something_changed = true;
 
             //Reset scroll position
@@ -501,6 +508,8 @@ impl Application {
         if something_changed {
             self.show_dots_timeout = DOTS_SHOW_TIMEOUT;
             let provider = &self.provider;
+            self.current_chunk_index =
+                (chunk_index_offset + (self.current_chunk_index as i32)) as usize;
             if self.current_chunk_index >= provider.chunk_count() {
                 self.current_chunk_index = provider.chunk_count() - 1;
             }
