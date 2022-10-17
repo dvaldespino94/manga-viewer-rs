@@ -36,7 +36,7 @@ pub fn get_chunks_from_image(image: &mut Image) -> Vec<Chunk> {
             let offset: usize = (x + y * image.width).try_into().unwrap();
 
             //Compare the color and a white threshold
-            if colors[offset].r < 250 {
+            if colors[offset].r < 210 {
                 white = false;
                 break;
             }
