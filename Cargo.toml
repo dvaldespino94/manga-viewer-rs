@@ -9,6 +9,8 @@ raylib = "3.7.0"
 rusqlite = { version = "0.28.0", features = ["bundled"] }
 libc = "0.2.132"
 rfd = "*"
+simplelog = "0.12.0"
+log = "0.4.17"
 
 [target.'cfg(windows)'.build-dependencies]
 windres="0.2"
