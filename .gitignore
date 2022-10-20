@@ -8,3 +8,4 @@ recent.txt
 todo.txt
 /images
 .vscode
+*.log

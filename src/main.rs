@@ -1,9 +1,11 @@
 #![windows_subsystem = "windows"]
 
-use std::borrow::BorrowMut;
+use std::{borrow::BorrowMut, fs::File};
 
 use application::Application;
+use log::*;
 use raylib::prelude::*;
+use simplelog::{ColorChoice, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger};
 
 pub mod application;
 pub mod archive;
@@ -18,20 +20,42 @@ pub mod unarr;
 const APP_TITLE: &str = "Manga Viewer";
 const APP_VERSION: (i8, i8, i8) = (0, 1, 0);
 
-fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread, size: i32) -> Font {
-    let font: Font = rl
-        .load_font_ex(
-            thread,
-            "./fonts/Roboto-Light.ttf",
-            size,
-            FontLoadEx::Default(255),
-        )
-        .expect("Can't load default font!");
-
-    font
+fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread, size: i32) -> Result<Font, String> {
+    rl.load_font_ex(
+        thread,
+        "./fonts/Roboto-Light.ttf",
+        size,
+        FontLoadEx::Default(255),
+    )
 }
 
 fn main() {
+    std::fs::write("/tmp/log", "Starting").unwrap();
+
+    match simplelog::CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Warn,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create("manga-viewer.log").unwrap(),
+        ),
+    ])
+    {
+        Ok(_) => {
+            std::fs::write("/tmp/log.txt", format!("Logs created!")).unwrap();
+        },
+        Err(error) => {
+            std::fs::write("/tmp/log.txt", format!("Error creating logs: {error}!")).unwrap();
+        },
+    }
+
+    debug!("Running");
+
     //Initialze RayGUI
     let (mut rl, thread) = init()
         //Set Window Size
@@ -43,14 +67,35 @@ fn main() {
         //Finally call build to get the context initialized
         .build();
 
+    debug!("Loading logo data");
+
     let logo_data = include_bytes!("../images/icon.png");
     let mut data = Vec::new();
     data.extend_from_slice(logo_data);
 
-    let mut logo_image = Image::load_image_from_mem(".png", &data, logo_data.len() as i32).unwrap();
-    logo_image.resize(50, 50);
-    let logo_texture = rl.load_texture_from_image(&thread, &logo_image).unwrap();
+    let (mut logo_image, logo_texture) =
+        match Image::load_image_from_mem(".png", &data, logo_data.len() as i32) {
+            Ok(mut it) => {
+                it.resize(50, 50);
+                let texture = rl
+                    .load_texture_from_image(&thread, &it)
+                    .unwrap_or_else(|err| {
+                        error!("Error loading texture: 'err'");
+                        rl.load_texture_from_image(
+                            &thread,
+                            &Image::gen_image_checked(20, 20, 4, 4, Color::BLACK, Color::WHITE),
+                        )
+                        .unwrap()
+                    });
+                (it, texture)
+            }
+            Err(error) => {
+                error!("Error loading logo_image: '{error}'");
+                return;
+            }
+        };
 
+    debug!("Setting window icon");
     rl.set_window_icon(logo_image);
 
     //Disable closing on Escape key
@@ -59,6 +104,7 @@ fn main() {
     //Set target FPS for the application to 30
     rl.set_target_fps(30);
 
+    debug!("Loading gui_font");
     let gui_font = rl
         .load_font_ex(
             &thread,
@@ -71,14 +117,29 @@ fn main() {
     //Format the Version string
     let app_version_string = format!("{:}.{:2}.{:2}", APP_VERSION.0, APP_VERSION.1, APP_VERSION.2);
 
+    debug!("Creating application");
     //Instantiate the application
     let mut app: Application = Application::new(&mut rl, &thread, logo_texture);
 
     //Padding for the main UI
     const PADDING: f32 = 10.0;
 
-    let title_font = load_font(&mut rl, &thread, 15);
-    let subtitle_font = load_font(&mut rl, &thread, 20);
+    debug!("Loading fonts");
+    let title_font = match load_font(&mut rl, &thread, 15) {
+        Ok(it) => it,
+        Err(error) => {
+            error!("Error loading font: '{error}'");
+            return;
+        }
+    };
+
+    let subtitle_font = match load_font(&mut rl, &thread, 20) {
+        Ok(it) => it,
+        Err(error) => {
+            error!("Error loading font: '{error}'");
+            return;
+        }
+    };
 
     #[cfg(target_os = "windows")]
     const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_CONTROL;
@@ -86,6 +147,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     const MOD_KEY: KeyboardKey = KeyboardKey::KEY_LEFT_SUPER;
 
+    debug!("Starting main loop");
     //RayLib's mainloop
     while !rl.borrow_mut().window_should_close() {
         app.load_textures(rl.borrow_mut(), &thread);
@@ -109,7 +171,7 @@ fn main() {
             if let Some(result) = fd.pick_folder() {
                 if let Err(open_result) = app.open_document(&String::from(result.to_str().unwrap()))
                 {
-                    eprintln!("Error opening document: {}", open_result)
+                    error!("Error opening document: {}", open_result)
                 }
             }
         }
