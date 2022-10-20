@@ -859,6 +859,7 @@ impl Application {
         self.current_document_path = None;
 
         self.update_recents();
+        self.title_changed = true;
     }
 
     fn all_chunks(&mut self) -> Vec<Chunk> {
