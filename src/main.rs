@@ -44,14 +44,13 @@ fn main() {
             Config::default(),
             File::create("manga-viewer.log").unwrap(),
         ),
-    ])
-    {
+    ]) {
         Ok(_) => {
             std::fs::write("/tmp/log.txt", format!("Logs created!")).unwrap();
-        },
+        }
         Err(error) => {
             std::fs::write("/tmp/log.txt", format!("Error creating logs: {error}!")).unwrap();
-        },
+        }
     }
 
     debug!("Running");
@@ -73,14 +72,14 @@ fn main() {
     let mut data = Vec::new();
     data.extend_from_slice(logo_data);
 
-    let (mut logo_image, logo_texture) =
+    let (logo_image, logo_texture) =
         match Image::load_image_from_mem(".png", &data, logo_data.len() as i32) {
             Ok(mut it) => {
                 it.resize(50, 50);
                 let texture = rl
                     .load_texture_from_image(&thread, &it)
                     .unwrap_or_else(|err| {
-                        error!("Error loading texture: 'err'");
+                        error!("Error loading texture: '{err}'");
                         rl.load_texture_from_image(
                             &thread,
                             &Image::gen_image_checked(20, 20, 4, 4, Color::BLACK, Color::WHITE),

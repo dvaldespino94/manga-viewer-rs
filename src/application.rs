@@ -1,4 +1,4 @@
-use std::{cmp::min, collections::HashMap, ffi::CString, time::SystemTime};
+use std::{cmp::min, collections::HashMap, ffi::CString};
 
 use crate::{chunkprovider::metaprovider::MetaProvider, database::Database};
 use raylib::prelude::*;
@@ -113,7 +113,7 @@ impl Application {
     /// Creates a new [`Application`].
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread, logo_texture: Texture2D) -> Self {
         let provider = Box::new(MetaProvider::new());
-        let mut db = Database::new();
+        let db = Database::new();
 
         //Return a new application
         let mut app = Self {
@@ -190,7 +190,7 @@ impl Application {
 
             let provider = &mut self.provider;
             //Try to get the image from the provider
-            if let Some(mut image) = provider.get_image(*query) {
+            if let Some(image) = provider.get_image(*query) {
                 //Get the texture from the image
                 let value = Some(context.load_texture_from_image(thread, image).unwrap());
                 //Insert the texture into the app's index/texture hash
@@ -780,12 +780,12 @@ impl Application {
                     eprintln!("Using default metadata for {path}!");
 
                     let new_metadata = ComicMetadata {
+                        last_time_opened: get_time() as u64,
                         title: String::from(path),
                         chunk_count: 0,
                         last_seen_chunk: 0,
                         path: String::from(path),
                         thumbnail: None,
-                        last_time_opened: unsafe { get_time() } as u64,
                     };
 
                     //Save metadata for this document
@@ -800,8 +800,12 @@ impl Application {
                 self.current_chunk_index = metadata.last_seen_chunk;
                 self.recent_documents.push(metadata.clone());
 
-                self.db
-                    .save_metadata(&self.recent_documents.iter().collect());
+                if let Err(error) = self
+                    .db
+                    .save_metadata(&self.recent_documents.iter().collect())
+                {
+                    return Err(error.to_string());
+                }
 
                 self.current_document_path = Some(metadata.path);
 
