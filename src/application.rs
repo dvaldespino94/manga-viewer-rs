@@ -8,7 +8,7 @@ const MAX_RECENT_DOCUMENTS: usize = 8;
 
 const CARD_WIDTH: usize = 120;
 const CARD_HEIGHT: usize = CARD_WIDTH * 16 / 9;
-const CARD_SPACING: usize = 10;
+const CARD_SPACING: usize = 20;
 
 use crate::{
     structs::{Chunk, ComicMetadata},
