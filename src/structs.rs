@@ -1,4 +1,4 @@
-use raylib::{prelude::*};
+use raylib::prelude::*;
 
 use crate::application::get_time;
 

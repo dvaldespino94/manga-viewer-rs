@@ -68,7 +68,10 @@ impl IChunkProvider for DirChunkProvider {
             if let Ok(dir) = path.read_dir() {
                 self.files = dir
                     .map(|element| element.unwrap().path().to_str().unwrap().to_string())
-                    .filter(|element| element.to_lowercase().ends_with(".jpg") || element.to_lowercase().ends_with(".png"))
+                    .filter(|element| {
+                        element.to_lowercase().ends_with(".jpg")
+                            || element.to_lowercase().ends_with(".png")
+                    })
                     .collect();
             }
 

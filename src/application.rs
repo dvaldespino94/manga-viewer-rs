@@ -38,7 +38,7 @@ impl ApplicationFonts {
                 14,
                 FontLoadEx::Default(255),
             )
-            .unwrap(),
+            .expect("Error loading fonts"),
         ));
         fonts.push(Box::new(
             rl.load_font_ex(
@@ -47,7 +47,7 @@ impl ApplicationFonts {
                 18,
                 FontLoadEx::Default(255),
             )
-            .unwrap(),
+            .expect("Error loading fonts"),
         ));
         fonts.push(Box::new(
             rl.load_font_ex(
@@ -56,20 +56,20 @@ impl ApplicationFonts {
                 22,
                 FontLoadEx::Default(255),
             )
-            .unwrap(),
+            .expect("Error loading fonts"),
         ));
 
         Self { fonts }
     }
 
     fn default(&self) -> &Box<Font> {
-        self.fonts.get(0).unwrap()
+        self.fonts.get(0).expect("Font index out of bounds")
     }
     fn large(&self) -> &Box<Font> {
-        self.fonts.get(1).unwrap()
+        self.fonts.get(1).expect("Font index out of bounds")
     }
     fn bold(&self) -> &Box<Font> {
-        self.fonts.get(2).unwrap()
+        self.fonts.get(2).expect("Font index out of bounds")
     }
 }
 
@@ -192,7 +192,13 @@ impl Application {
             //Try to get the image from the provider
             if let Some(image) = provider.get_image(*query) {
                 //Get the texture from the image
-                let value = Some(context.load_texture_from_image(thread, image).unwrap());
+                let value = match context.load_texture_from_image(thread, image) {
+                    Ok(it) => Some(it),
+                    Err(error) => {
+                        log::error!("Error loading image: {error}");
+                        None
+                    }
+                };
                 //Insert the texture into the app's index/texture hash
                 self.textures.insert(*query, value);
 
