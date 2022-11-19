@@ -299,7 +299,7 @@ impl Application {
             let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
                 // eprintln!("Getting texture from cache!");
                 //Unwrap the texture from the local hash
-                match self.textures.get(&chunk.texture_index){
+                match self.textures.get(&chunk.texture_index) {
                     Some(it) => it,
                     None => &None,
                 }
@@ -732,24 +732,25 @@ impl Application {
                     let index = col_index + (row_index * cols);
 
                     if index < self.recent_documents.len() {
-                        let metadata = self.recent_documents.get(index).unwrap();
+                        if let Some(metadata) = self.recent_documents.get(index) {
+                            let thumbnail = if metadata.thumbnail.is_none() {
+                                None
+                            } else {
+                                self.recent_thumbs.get(index)
+                            };
 
-                        let thumbnail = if metadata.thumbnail.is_none() {
-                            None
-                        } else {
-                            self.recent_thumbs.get(index)
-                        };
-
-                        match self.draw_recent_card(rect, context, Some(metadata), thumbnail) {
-                            CardAction::None => {}
-                            CardAction::OpenDocument => {
-                                let metadata = self.recent_documents.get(index).unwrap();
-                                let path_copy = &metadata.path.to_string();
-                                return self.open_document(path_copy).is_ok();
-                            }
-                            CardAction::RemoveDocument => {
-                                self.recent_documents.remove(index);
-                                return true;
+                            match self.draw_recent_card(rect, context, Some(metadata), thumbnail) {
+                                CardAction::None => {}
+                                CardAction::OpenDocument => {
+                                    if let Some(metadata) = self.recent_documents.get(index) {
+                                        let path_copy = &metadata.path.to_string();
+                                        return self.open_document(path_copy).is_ok();
+                                    }
+                                }
+                                CardAction::RemoveDocument => {
+                                    self.recent_documents.remove(index);
+                                    return true;
+                                }
                             }
                         }
                     } else {
@@ -841,7 +842,19 @@ impl Application {
             return;
         };
 
-        let current_metadata = self.recent_documents.first().unwrap();
+        let default_comic_metadata = ComicMetadata {
+            last_time_opened: 0,
+            title: String::new(),
+            chunk_count: 0,
+            last_seen_chunk: 0,
+            path: String::new(),
+            thumbnail: None,
+        };
+
+        let current_metadata = match self.recent_documents.first() {
+            Some(it) => it,
+            None => &default_comic_metadata,
+        };
         let metadata = ComicMetadata {
             chunk_count: self.provider.chunk_count(),
             last_seen_chunk: self.current_chunk_index,
@@ -875,16 +888,12 @@ impl Application {
 
     fn all_chunks(&mut self) -> Vec<Chunk> {
         (0..self.provider.chunk_count())
-            .map(|index| {
-                let c = self.provider.get_chunk(index);
-                if c.is_some() {
-                    *c.unwrap()
-                } else {
-                    Chunk {
-                        rect: Rectangle::new(0.0, 0.0, 0.0, 0.0),
-                        texture_index: 0,
-                    }
-                }
+            .map(|index| match self.provider.get_chunk(index) {
+                Some(it) => *it,
+                None => Chunk {
+                    rect: Rectangle::new(0.0, 0.0, 0.0, 0.0),
+                    texture_index: 0,
+                },
             })
             .filter(|x| x.rect.width > 0.0)
             .collect()
