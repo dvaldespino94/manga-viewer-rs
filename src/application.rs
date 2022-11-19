@@ -299,7 +299,10 @@ impl Application {
             let texture: &Option<Texture2D> = if self.textures.contains_key(&chunk.texture_index) {
                 // eprintln!("Getting texture from cache!");
                 //Unwrap the texture from the local hash
-                self.textures.get(&chunk.texture_index).unwrap()
+                match self.textures.get(&chunk.texture_index){
+                    Some(it) => it,
+                    None => &None,
+                }
             } else {
                 // eprintln!("Requesting image {}", chunk.texture_index);
                 //Add the texture index to texture-query list
