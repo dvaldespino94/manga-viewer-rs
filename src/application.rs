@@ -233,9 +233,7 @@ impl Application {
             self.show_dots_timeout -= 1.0 / (context.get_fps() as f32);
         }
 
-        if self.errors.len() > 0 {
-            let err = self.errors.get(0).unwrap();
-
+        if let Some(err) = self.errors.get(0) {
             let mut title_rect = screen_rect;
             let mut message_rect = screen_rect;
             let mut button_rect = screen_rect;
