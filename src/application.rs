@@ -215,7 +215,7 @@ impl Application {
                     std::fs::remove_file(TEMP_FILENAME);
                 }
 
-                if self.textures.len() >= 4 {
+                if self.textures.len() >= 4 && !self.texture_loading_order.is_empty() {
                     self.textures
                         .remove(&self.texture_loading_order.pop().unwrap());
                 }
