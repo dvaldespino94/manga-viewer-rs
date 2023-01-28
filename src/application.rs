@@ -512,9 +512,22 @@ impl Application {
         //Initial chunk index
         let initial_chunk_index = self.current_chunk_index;
 
+        let click_gesture = {
+            if context.is_mouse_button_pressed(MouseButton::MOUSE_LEFT_BUTTON) {
+                if context.get_mouse_x() < ((screen_size.width as i32) / 2) {
+                    0b01
+                } else {
+                    0b10
+                }
+            } else {
+                0b00
+            }
+        };
+
         //Check for simple next/prev events
         if context.is_key_pressed(KeyboardKey::KEY_PAGE_DOWN)
             || context.is_key_pressed(KeyboardKey::KEY_RIGHT)
+            || (click_gesture == 0b10)
         {
             chunk_index_offset = 1;
             something_changed = true;
@@ -527,6 +540,7 @@ impl Application {
             }
         } else if context.is_key_pressed(KeyboardKey::KEY_PAGE_UP)
             || context.is_key_pressed(KeyboardKey::KEY_LEFT)
+            || (click_gesture == 0b01)
         {
             chunk_index_offset = -1;
             something_changed = true;
