@@ -118,7 +118,14 @@ impl IChunkProvider for DirChunkProvider {
 
         eprintln!("Image {} not found, fetching...", index);
 
-        let mut image = Image::load_image(self.files[index].as_str()).unwrap();
+        let mut image = match Image::load_image(self.files[index].as_str()) {
+            Ok(it) => it,
+            Err(error) => {
+                log::error!("Error loading image: {error}");
+                return None;
+            }
+        };
+
         self.images.insert(index, image.clone());
 
         if index == self.chunk_index.len() {
